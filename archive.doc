@@ -76,6 +76,14 @@ materialising data using temporary files.
 
 \input{archive4pl.tex}
 
+\section{Status}
+
+The current version is merely a proof-of-concept. It lacks writing
+archives and does not support many of the options of the underlying
+library. The main motivation for starting this library was to achieve
+portability of the upcomming SWI-Prolog package distribution system.
+Other functionality will be added on `as needed' basis.
+
 \printindex
 
 \end{document}

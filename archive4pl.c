@@ -416,7 +416,8 @@ archive_next_header(term_t archive, term_t name)
     archive_read_data_skip(ar->archive);
 
   while ( (rc=archive_read_next_header(ar->archive, &ar->entry)) == ARCHIVE_OK )
-  { if ( PL_unify_atom_chars(name, archive_entry_pathname(ar->entry)) )
+  { if ( PL_unify_wchars(name, PL_ATOM, -1,
+			 archive_entry_pathname_w(ar->entry)) )
     { ar->status = AR_NEW_ENTRY;
       return TRUE;
     }
