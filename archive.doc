@@ -74,7 +74,7 @@ archive entries. E.g., archives may be read from Prolog streams and each
 member in turn may be processed using Prolog streams without
 materialising data using temporary files.
 
-\include{archive4pl}
+\input{archive4pl.tex}
 
 \printindex
 

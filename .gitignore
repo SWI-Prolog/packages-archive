@@ -13,8 +13,6 @@ archive.idx
 archive.ilg
 archive.out
 archive.toc
-archive4pl.aux
-archive4pl.tex.aux
 *.log
 *~
 *.o
