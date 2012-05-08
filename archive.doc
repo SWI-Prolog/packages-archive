@@ -1,0 +1,47 @@
+\documentclass[11pt]{article}
+\usepackage{times}
+\usepackage{pl}
+\usepackage{html}
+\sloppy
+\makeindex
+
+\onefile
+\htmloutput{.}					% Output directory
+\htmlmainfile{archive}				% Main document file
+\bodycolor{white}				% Page colour
+
+\begin{document}
+
+\title{SWI-Prolog binding to libarchive}
+\author{Jan Wielemaker \\
+	VU University Amsterdam \\
+	The Netherlands \\
+	E-mail: \email{J.Wielemaker@vu.nl}}
+
+\maketitle
+
+\begin{abstract}
+The library \url[libarchive]{http://code.google.com/p/libarchive/}
+provides a portable way to access archive files. This package is a
+Prolog wrapper around this library. The motivation to introduce this
+library is twofold. In the first place, it provides a minimal platform
+independent API to access archives. In the second place, it allows
+accessing archives through Prolog streams, which often elimaniates the
+need for temporary files and all related consequences for performance,
+security and platform dependency.
+\end{abstract}
+
+\pagebreak
+\tableofcontents
+
+\vfill
+\vfill
+
+\newpage
+
+\include{archive4pl.tex}
+
+\printindex
+
+\end{document}
+

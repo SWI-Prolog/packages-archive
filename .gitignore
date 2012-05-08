@@ -5,6 +5,10 @@ config.h.in
 config.log
 config.status
 configure
+archive.html
+archive.pdf
+archive.tex
+archive4pl.tex
 *~
 *.o
 *.so
