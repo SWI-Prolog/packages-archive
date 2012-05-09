@@ -33,7 +33,8 @@
 	    archive_next_header/2,	% +Archive, -Name
 	    archive_open_entry/2,	% +Archive, -EntryStream
 	    archive_header_property/2,	% +Archive, ?Property
-	    archive_extract/3		% +Archive, +Dir, +Options
+	    archive_extract/3,		% +Archive, +Dir, +Options
+	    archive_entries/2		% +Archive, -Entries
 	  ]).
 :- use_module(library(error)).
 
@@ -152,10 +153,16 @@ header_property(filetype(_)).
 
 %%	archive_extract(+ArchiveFile, +Dir, +Options)
 %
-%	Extract files from the given archive into Dir.
+%	Extract files from the given archive into Dir. Supported
+%	options:
+%
+%	  * remove_prefix(+Prefix)
+%	  Strip Prefix from all entries before extracting
 %
 %	@error	existence_error(directory, Dir) if Dir does not exist
 %		or is not a directory.
+%	@error  domain_error(path_prefix(Prefix), Path) if a path in
+%		the archive does not start with Prefix
 %	@tbd	Add options
 
 archive_extract(Archive, Dir, Options) :-
@@ -171,7 +178,14 @@ archive_extract(Archive, Dir, Options) :-
 extract(Archive, Dir, Options) :-
 	archive_next_header(Archive, Path), !,
 	(   archive_header_property(Archive, filetype(file))
-	->  directory_file_path(Dir, Path, Target),
+	->  (   option(remove_prefix(Remove), Options)
+	    ->	(   atom_concat(Remove, ExtractPath, Path)
+		->  true
+		;   domain_error(path_prefix(Remove), Path)
+		)
+	    ;	ExtractPath = Path
+	    ),
+	    directory_file_path(Dir, ExtractPath, Target),
 	    file_directory_name(Target, FileDir),
 	    make_directory_path(FileDir),
 	    setup_call_cleanup(
@@ -185,3 +199,19 @@ extract(Archive, Dir, Options) :-
 	),
 	extract(Archive, Dir, Options).
 extract(_, _, _).
+
+
+%%	archive_entries(+Archive, -Paths) is det.
+%
+%	True when Paths is a list of pathnames appearing in Archive.
+
+archive_entries(Archive, Paths) :-
+	setup_call_cleanup(
+	    archive_open(Archive, Handle, []),
+	    contents(Handle, Paths),
+	    archive_close(Handle)).
+
+contents(Handle, [Path|T]) :-
+	archive_next_header(Handle, Path), !,
+	contents(Handle, T).
+contents(_, []).
