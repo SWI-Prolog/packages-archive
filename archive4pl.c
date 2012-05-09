@@ -85,10 +85,19 @@ static atom_t ATOM_mtree;
 static atom_t ATOM_raw;
 static atom_t ATOM_tar;
 static atom_t ATOM_zip;
+static atom_t ATOM_file;
+static atom_t ATOM_link;
+static atom_t ATOM_socket;
+static atom_t ATOM_character_device;
+static atom_t ATOM_block_device;
+static atom_t ATOM_directory;
+static atom_t ATOM_fifo;
 
 static functor_t FUNCTOR_error2;
 static functor_t FUNCTOR_archive_error2;
-
+static functor_t FUNCTOR_filetype1;
+static functor_t FUNCTOR_mtime1;
+static functor_t FUNCTOR_size1;
 
 		 /*******************************
 		 *	  SYMBOL WRAPPER	*
@@ -279,7 +288,7 @@ enable_type(archive_wrapper *ar, int type,
 }
 
 static foreign_t
-archive_open(term_t data, term_t handle, term_t options)
+archive_open_stream(term_t data, term_t handle, term_t options)
 { IOSTREAM *datas;
   archive_wrapper *ar;
   term_t tail = PL_copy_term_ref(options);
@@ -454,6 +463,58 @@ archive_close(term_t archive)
   return archive_error(ar);
 }
 
+		 /*******************************
+		 *	       HEADERS		*
+		 *******************************/
+
+static foreign_t
+archive_header_prop(term_t archive, term_t field)
+{ archive_wrapper *ar;
+  functor_t prop;
+
+  if ( !get_archive(archive, &ar) )
+    return FALSE;
+
+  if ( !PL_get_functor(field, &prop) )
+    return PL_type_error("compound", field);
+  if ( ar->status != AR_NEW_ENTRY )
+    return PL_permission_error("access", "archive_entry", archive);
+
+  if ( prop == FUNCTOR_filetype1 )
+  { mode_t type = archive_entry_filetype(ar->entry);
+    atom_t name;
+    term_t arg = PL_new_term_ref();
+    _PL_get_arg(1, field, arg);
+
+    switch(type&AE_IFMT)
+    { case AE_IFREG:  name = ATOM_file;             break;
+      case AE_IFLNK:  name = ATOM_link;             break;
+      case AE_IFSOCK: name = ATOM_socket;           break;
+      case AE_IFCHR:  name = ATOM_character_device; break;
+      case AE_IFBLK:  name = ATOM_block_device;     break;
+      case AE_IFDIR:  name = ATOM_directory;        break;
+      case AE_IFIFO:  name = ATOM_fifo;             break;
+      default:
+	assert(0);
+    }
+    return PL_unify_atom(arg, name);
+  } else if ( prop == FUNCTOR_mtime1 )
+  { time_t stamp = archive_entry_mtime(ar->entry);
+    term_t arg = PL_new_term_ref();
+    _PL_get_arg(1, field, arg);
+
+    return PL_unify_float(arg, (double)stamp);
+  } else if ( prop == FUNCTOR_size1 )
+  { int64_t size = archive_entry_size(ar->entry);
+    term_t arg = PL_new_term_ref();
+    _PL_get_arg(1, field, arg);
+
+    return PL_unify_int64(arg, size);
+  }
+
+  return PL_domain_error("archive_header_property", field);
+}
+
 
 		 /*******************************
 		 *	    READ MEMBERS	*
@@ -512,7 +573,6 @@ archive_open_entry(term_t archive, term_t stream)
 }
 
 
-
 		 /*******************************
 		 *	      INSTALL		*
 		 *******************************/
@@ -542,12 +602,23 @@ install_archive4pl(void)
   MKATOM(raw);
   MKATOM(tar);
   MKATOM(zip);
+  MKATOM(file);
+  MKATOM(link);
+  MKATOM(socket);
+  MKATOM(character_device);
+  MKATOM(block_device);
+  MKATOM(directory);
+  MKATOM(fifo);
 
-  MKFUNCTOR(error, 2);
+  MKFUNCTOR(error,         2);
   MKFUNCTOR(archive_error, 2);
+  MKFUNCTOR(filetype,      1);
+  MKFUNCTOR(mtime,         1);
+  MKFUNCTOR(size,          1);
 
-  PL_register_foreign("archive_open",        3, archive_open,        0);
-  PL_register_foreign("archive_close",       1, archive_close,       0);
-  PL_register_foreign("archive_next_header", 2, archive_next_header, 0);
-  PL_register_foreign("archive_open_entry",  2, archive_open_entry,  0);
+  PL_register_foreign("archive_open_stream",  3, archive_open_stream, 0);
+  PL_register_foreign("archive_close",        1, archive_close,       0);
+  PL_register_foreign("archive_next_header",  2, archive_next_header, 0);
+  PL_register_foreign("archive_header_prop_", 2, archive_header_prop, 0);
+  PL_register_foreign("archive_open_entry",   2, archive_open_entry,  0);
 }

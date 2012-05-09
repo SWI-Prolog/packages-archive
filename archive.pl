@@ -31,8 +31,11 @@
 	  [ archive_open/3,		% +Stream, -Archive, +Options
 	    archive_close/1,		% +Archive
 	    archive_next_header/2,	% +Archive, -Name
-	    archive_open_entry/2	% +Archive, -EntryStream
+	    archive_open_entry/2,	% +Archive, -EntryStream
+	    archive_header_property/2,	% +Archive, ?Property
+	    archive_extract/3		% +Archive, +Dir, +Options
 	  ]).
+:- use_module(library(error)).
 
 /** <module> Access several archive formats
 
@@ -41,8 +44,7 @@ The following example lists the entries in an archive:
 
   ==
   list_archive(File) :-
-	open(File, read, Data, [type(binary)]),
-	archive_create(Data, Archive, [close_parent(true)]),
+	archive_open(File, Archive, []),
 	repeat,
 	   (   archive_next_header(Archive, Path)
 	   ->  format('~w~n', [Path]),
@@ -57,11 +59,11 @@ The following example lists the entries in an archive:
 
 :- use_foreign_library(foreign(archive4pl)).
 
-%%	archive_open(+Stream, -Archive, +Options) is det.
+%%	archive_open(+Data, -Archive, +Options) is det.
 %
-%	If Stream is a (binary) stream   that  contains a valid archive,
-%	unify Archive with a handle that  provides access to the content
-%	of the archive. Details are   controlled  by Options. Typically,
+%	Open the archive in Data and unify  Archive with a handle to the
+%	opened archive. Data is either a file  or a stream that contains
+%	a valid archive. Details are   controlled by Options. Typically,
 %	the option close_parent(true) is used  to   close  stream if the
 %	archive is closed using archive_close/1.  For other options, the
 %	defaults are typically fine. The option format(raw) must be used
@@ -85,6 +87,17 @@ The following example lists the entries in an archive:
 %	  options are provided, =all= is assumed. Supported values are:
 %	  =all=, =ar=, =cpio=, =empty=, =iso9660=, =mtree=, =raw=,
 %	  =tar= and =zip=.  The value =all= is default.
+
+archive_open(stream(Stream), Archive, Options) :- !,
+	archive_open_stream(Stream, Archive, Options).
+archive_open(Stream, Archive, Options) :-
+	is_stream(Stream), !,
+	archive_open_stream(Stream, Archive, Options).
+archive_open(File, Archive, Options) :-
+	open(File, read, Stream, [type(binary)]),
+	catch(archive_open_stream(Stream, Archive, [close_parent(true)|Options]),
+	      E, (close(Stream), throw(E))).
+
 
 %%	archive_close(+Archive) is det.
 %
@@ -114,7 +127,61 @@ The following example lists the entries in an archive:
 %
 %	Open the current entry as a stream.  Stream must be closed.
 
-%%	archive_header_data(+Header, +Field, -Value)
+%%	archive_header_property(+Archive, ?Property)
 %
-%	Extract information from the header.
+%	True when Property is a property of the current header.  Defined
+%	properties are:
+%
+%	  * filetype(-Type)
+%	  Type is one of =file=, =link=, =socket=, =character_device=,
+%	  =block_device=, =directory= or =fifo=.
+%	  * mtime(-Time)
+%	  True when entry was last modified at time.
+%	  * size(-Bytes)
+%	  True when entry is Bytes long.
 
+archive_header_property(Archive, Property) :-
+	(   nonvar(Property)
+	->  true
+	;   header_property(Property)
+	),
+	archive_header_prop_(Archive, Property).
+
+header_property(filetype(_)).
+
+
+%%	archive_extract(+ArchiveFile, +Dir, +Options)
+%
+%	Extract files from the given archive into Dir.
+%
+%	@error	existence_error(directory, Dir) if Dir does not exist
+%		or is not a directory.
+%	@tbd	Add options
+
+archive_extract(Archive, Dir, Options) :-
+	(   exists_directory(Dir)
+	->  true
+	;   existence_error(directory, Dir)
+	),
+	setup_call_cleanup(
+	    archive_open(Archive, Handle, Options),
+	    extract(Handle, Dir, Options),
+	    archive_close(Handle)).
+
+extract(Archive, Dir, Options) :-
+	archive_next_header(Archive, Path), !,
+	(   archive_header_property(Archive, filetype(file))
+	->  directory_file_path(Dir, Path, Target),
+	    file_directory_name(Target, FileDir),
+	    make_directory_path(FileDir),
+	    setup_call_cleanup(
+		archive_open_entry(Archive, In),
+		setup_call_cleanup(
+		    open(Target, write, Out, [type(binary)]),
+		    copy_stream_data(In, Out),
+		    close(Out)),
+		close(In))
+	;   true
+	),
+	extract(Archive, Dir, Options).
+extract(_, _, _).
