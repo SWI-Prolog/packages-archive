@@ -19,3 +19,9 @@ archive.toc
 *.so
 *.dll
 *.dylib
+*.manifest
+*.exp
+*.ilk
+*.lib
+*.obj
+*.pdb

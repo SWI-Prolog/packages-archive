@@ -23,6 +23,9 @@
 
 #include <SWI-Stream.h>
 #include <SWI-Prolog.h>
+#ifdef __WINDOWS__
+#define LIBARCHIVE_STATIC 1
+#endif
 #include <archive.h>
 #include <archive_entry.h>
 #include <assert.h>
