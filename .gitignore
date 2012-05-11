@@ -13,6 +13,7 @@ archive.idx
 archive.ilg
 archive.out
 archive.toc
+archive.ind
 *.log
 *~
 *.o
