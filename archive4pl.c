@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@uva.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 2008-2009, University of Amsterdam
+    Copyright (C): 2012, VU University Amsterdam
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public
@@ -481,7 +481,7 @@ archive_header_prop(term_t archive, term_t field)
     return PL_permission_error("access", "archive_entry", archive);
 
   if ( prop == FUNCTOR_filetype1 )
-  { mode_t type = archive_entry_filetype(ar->entry);
+  { __LA_MODE_T type = archive_entry_filetype(ar->entry);
     atom_t name;
     term_t arg = PL_new_term_ref();
     _PL_get_arg(1, field, arg);
