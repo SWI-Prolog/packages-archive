@@ -9,17 +9,25 @@ AC_SUBST(ARCHIVE_PLTARGETS)
 
 m4_include([../ac_swi_c.m4])
 
-AC_CHECK_HEADERS(archive.h)
-AC_CHECK_LIB(archive, archive_read_new,
-	     LIBS="$LIBS -larchive"
-	     ARCHIVELIB=yes,
-	     ARCHIVELIB=no)
+AC_CHECK_HEADER(archive.h,
+		[ AC_DEFINE([HAVE_ARCHIVE_H], 1,
+			    [Define to 1 if you have <archive.h>.])
+		  ARCHIVEH=yes
+		],
+		ARCHIVEH=no)
+
+if test "$ARCHIVEH" = yes; then
+  AC_CHECK_LIB(archive, archive_read_new,
+	       LIBS="$LIBS -larchive"
+	       ARCHIVELIB=yes,
+	       ARCHIVELIB=no)
+fi
 
 if test "$ARCHIVELIB" = yes; then
   ARCHIVE_TARGETS="archive4pl.$SO"
   ARCHIVE_PLTARGETS=archive.pl
 else
-  ZLIB_TARGETS=nolib
+  ARCHIVE_TARGETS=nolib
   cat << EOF
 ##################################################################
 # ERROR: Could not find library archive (-larchive).  Dropped
@@ -27,7 +35,11 @@ else
 # http://code.google.com/p/libarchive/
 #
 # Most Unix/Linux distributions are shipped with binaries.  Make
-# sure to have the development library installed.
+# sure to have the development library installed.  E.g.
+#
+#   Debian/Ubuntu/Mint:	aptitude install libarchive-dev
+#   Fedora/...		yum install libarchive-devel
+#   MacOS (Macports):   port install libarchive
 ##################################################################
 EOF
 fi
