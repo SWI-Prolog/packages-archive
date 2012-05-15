@@ -88,6 +88,17 @@ The following example lists the entries in an archive:
 %	  options are provided, =all= is assumed. Supported values are:
 %	  =all=, =ar=, =cpio=, =empty=, =iso9660=, =mtree=, =raw=,
 %	  =tar= and =zip=.  The value =all= is default.
+%
+%	Note that the actually supported   compression types and formats
+%	may vary depending on the version   and  installation options of
+%	the underlying libarchive  library.  This   predicate  raises  a
+%	domain  error  if  the  (explicitly)  requested  format  is  not
+%	supported.
+%
+%	@error	domain_error(compression, Compression) if the requested
+%		compression type is not supported.
+%	@error	domain_error(format, Format) if the requested
+%		format type is not supported.
 
 archive_open(stream(Stream), Archive, Options) :- !,
 	archive_open_stream(Stream, Archive, Options).

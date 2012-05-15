@@ -23,6 +23,22 @@ if test "$ARCHIVEH" = yes; then
 	       ARCHIVELIB=no)
 fi
 
+AC_CHECK_FUNCS(archive_read_support_compression_bzip2 \
+	       archive_read_support_compression_compress \
+	       archive_read_support_compression_gzip \
+	       archive_read_support_compression_lzma \
+	       archive_read_support_compression_none \
+	       archive_read_support_compression_xz)
+
+AC_CHECK_FUNCS(archive_read_support_format_ar \
+	       archive_read_support_format_cpio \
+	       archive_read_support_format_empty \
+	       archive_read_support_format_iso9660 \
+	       archive_read_support_format_mtree \
+	       archive_read_support_format_raw \
+	       archive_read_support_format_tar \
+	       archive_read_support_format_zip)
+
 if test "$ARCHIVELIB" = yes; then
   ARCHIVE_TARGETS="archive4pl.$SO"
   ARCHIVE_PLTARGETS=archive.pl

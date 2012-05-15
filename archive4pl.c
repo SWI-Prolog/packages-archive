@@ -32,6 +32,26 @@
 #include <string.h>
 #include <errno.h>
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#else					/* assume complete recent libarchive */
+#define HAVE_ARCHIVE_READ_SUPPORT_COMPRESSION_BZIP2 1
+#define HAVE_ARCHIVE_READ_SUPPORT_COMPRESSION_COMPRESS 1
+#define HAVE_ARCHIVE_READ_SUPPORT_COMPRESSION_GZIP 1
+#define HAVE_ARCHIVE_READ_SUPPORT_COMPRESSION_LZMA 1
+#define HAVE_ARCHIVE_READ_SUPPORT_COMPRESSION_NONE 1
+#define HAVE_ARCHIVE_READ_SUPPORT_COMPRESSION_XZ 1
+#define HAVE_ARCHIVE_READ_SUPPORT_FORMAT_AR 1
+#define HAVE_ARCHIVE_READ_SUPPORT_FORMAT_CPIO 1
+#define HAVE_ARCHIVE_READ_SUPPORT_FORMAT_EMPTY 1
+#define HAVE_ARCHIVE_READ_SUPPORT_FORMAT_ISO9660 1
+#define HAVE_ARCHIVE_READ_SUPPORT_FORMAT_MTREE 1
+#define HAVE_ARCHIVE_READ_SUPPORT_FORMAT_RAW 1
+#define HAVE_ARCHIVE_READ_SUPPORT_FORMAT_TAR 1
+#define HAVE_ARCHIVE_READ_SUPPORT_FORMAT_ZIP 1
+#endif
+
+
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 		Design of the libarchive interface
 
@@ -261,22 +281,51 @@ archive_error(archive_wrapper *ar)
 
 
 #define	COMPRESS_ALL	  0x00ff
+#ifdef HAVE_ARCHIVE_READ_SUPPORT_COMPRESSION_BZIP2
 #define	COMPRESS_BZIP2	  0x0001
+#endif
+#ifdef HAVE_ARCHIVE_READ_SUPPORT_COMPRESSION_COMPRESS
 #define	COMPRESS_COMPRESS 0x0002
+#endif
+#ifdef HAVE_ARCHIVE_READ_SUPPORT_COMPRESSION_GZIP
 #define	COMPRESS_GZIP	  0x0004
+#endif
+#ifdef HAVE_ARCHIVE_READ_SUPPORT_COMPRESSION_LZMA
 #define	COMPRESS_LZMA	  0x0008
+#endif
+#ifdef HAVE_ARCHIVE_READ_SUPPORT_COMPRESSION_NONE
 #define	COMPRESS_NONE	  0x0010
+#endif
+#ifdef HAVE_ARCHIVE_READ_SUPPORT_COMPRESSION_XZ
 #define	COMPRESS_XZ	  0x0020
+#endif
 
 #define FORMAT_ALL	  0xff00
+#ifdef HAVE_ARCHIVE_READ_SUPPORT_FORMAT_AR
 #define FORMAT_AR	  0x0100
+#endif
+#ifdef HAVE_ARCHIVE_READ_SUPPORT_FORMAT_CPIO
 #define FORMAT_CPIO	  0x0200
+#endif
+#ifdef HAVE_ARCHIVE_READ_SUPPORT_FORMAT_EMPTY
 #define FORMAT_EMPTY	  0x0400
+#endif
+#ifdef HAVE_ARCHIVE_READ_SUPPORT_FORMAT_ISO9660
 #define FORMAT_ISO9960	  0x0800
+#endif
+#ifdef HAVE_ARCHIVE_READ_SUPPORT_FORMAT_MTREE
 #define FORMAT_MTREE	  0x1000
+#endif
+#ifdef HAVE_ARCHIVE_READ_SUPPORT_FORMAT_RAW
 #define FORMAT_RAW	  0x2000
+#endif
+#ifdef HAVE_ARCHIVE_READ_SUPPORT_FORMAT_TAR
 #define FORMAT_TAR	  0x4000
+#endif
+#ifdef HAVE_ARCHIVE_READ_SUPPORT_FORMAT_ZIP
 #define FORMAT_ZIP	  0x8000
+#endif
+
 
 static void
 enable_type(archive_wrapper *ar, int type,
@@ -324,18 +373,30 @@ archive_open_stream(term_t data, term_t handle, term_t options)
 
       if ( c == ATOM_all )
 	ar->type |= COMPRESS_ALL;
+#ifdef COMPRESS_BZIP2
       else if ( c == ATOM_bzip2 )
 	ar->type |= COMPRESS_BZIP2;
+#endif
+#ifdef COMPRESS_COMPRESS
       else if ( c == ATOM_compress )
 	ar->type |= COMPRESS_COMPRESS;
+#endif
+#ifdef COMPRESS_GZIP
       else if ( c == ATOM_gzip )
 	ar->type |= COMPRESS_GZIP;
+#endif
+#ifdef COMPRESS_LZMA
       else if ( c == ATOM_lzma )
 	ar->type |= COMPRESS_LZMA;
+#endif
+#ifdef COMPRESS_NONE
       else if ( c == ATOM_none )
 	ar->type |= COMPRESS_NONE;
+#endif
+#ifdef COMPRESS_XZ
       else if ( c == ATOM_xz )
 	ar->type |= COMPRESS_XZ;
+#endif
       else
 	return PL_domain_error("compression", arg);
     } else if ( name == ATOM_format )
@@ -346,22 +407,38 @@ archive_open_stream(term_t data, term_t handle, term_t options)
 
       if ( f == ATOM_all )
 	ar->type |= FORMAT_ALL;
+#ifdef FORMAT_AR
       else if ( f == ATOM_ar )
 	ar->type |= FORMAT_AR;
+#endif
+#ifdef FORMAT_CPIO
       else if ( f == ATOM_cpio )
 	ar->type |= FORMAT_CPIO;
+#endif
+#ifdef FORMAT_EMPTY
       else if ( f == ATOM_empty )
 	ar->type |= FORMAT_EMPTY;
+#endif
+#ifdef FORMAT_ISO9960
       else if ( f == ATOM_iso9960 )
 	ar->type |= FORMAT_ISO9960;
+#endif
+#ifdef FORMAT_MTREE
       else if ( f == ATOM_mtree )
 	ar->type |= FORMAT_MTREE;
+#endif
+#ifdef FORMAT_RAW
       else if ( f == ATOM_raw )
 	ar->type |= FORMAT_RAW;
+#endif
+#ifdef FORMAT_TAR
       else if ( f == ATOM_tar )
 	ar->type |= FORMAT_TAR;
+#endif
+#ifdef FORMAT_ZIP
       else if ( f == ATOM_zip )
 	ar->type |= FORMAT_ZIP;
+#endif
       else
 	return PL_domain_error("format", arg);
     } else if ( name == ATOM_close_parent )
@@ -383,25 +460,55 @@ archive_open_stream(term_t data, term_t handle, term_t options)
   if ( (ar->type & COMPRESS_ALL) == COMPRESS_ALL )
   { archive_read_support_compression_all(ar->archive);
   } else
-  { enable_type(ar, COMPRESS_BZIP2,    archive_read_support_compression_bzip2);
+  {
+#ifdef COMPRESS_BZIP2
+    enable_type(ar, COMPRESS_BZIP2,    archive_read_support_compression_bzip2);
+#endif
+#ifdef COMPRESS_COMPRESS
     enable_type(ar, COMPRESS_COMPRESS, archive_read_support_compression_compress);
+#endif
+#ifdef COMPRESS_GZIP
     enable_type(ar, COMPRESS_GZIP,     archive_read_support_compression_gzip);
+#endif
+#ifdef COMPRESS_LZMA
     enable_type(ar, COMPRESS_LZMA,     archive_read_support_compression_lzma);
+#endif
+#ifdef COMPRESS_NONE
     enable_type(ar, COMPRESS_NONE,     archive_read_support_compression_none);
+#endif
+#ifdef COMPRESS_XZ
     enable_type(ar, COMPRESS_XZ,       archive_read_support_compression_xz);
+#endif
   }
 
   if ( (ar->type & FORMAT_ALL) == FORMAT_ALL )
   { archive_read_support_format_all(ar->archive);
   } else
-  { enable_type(ar, FORMAT_AR,      archive_read_support_format_ar);
+  {
+#ifdef FORMAT_AR
+    enable_type(ar, FORMAT_AR,      archive_read_support_format_ar);
+#endif
+#ifdef FORMAT_CPIO
     enable_type(ar, FORMAT_CPIO,    archive_read_support_format_cpio);
+#endif
+#ifdef FORMAT_EMPTY
     enable_type(ar, FORMAT_EMPTY,   archive_read_support_format_empty);
+#endif
+#ifdef FORMAT_ISO9960
     enable_type(ar, FORMAT_ISO9960, archive_read_support_format_iso9660);
+#endif
+#ifdef FORMAT_MTREE
     enable_type(ar, FORMAT_MTREE,   archive_read_support_format_mtree);
+#endif
+#ifdef FORMAT_RAW
     enable_type(ar, FORMAT_RAW,     archive_read_support_format_raw);
+#endif
+#ifdef FORMAT_TAR
     enable_type(ar, FORMAT_TAR,     archive_read_support_format_tar);
+#endif
+#ifdef FORMAT_ZIP
     enable_type(ar, FORMAT_ZIP,     archive_read_support_format_zip);
+#endif
   }
 
   if ( archive_read_open2(ar->archive, ar,
