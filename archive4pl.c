@@ -673,7 +673,7 @@ archive_open_entry(term_t archive, term_t stream)
   if ( !get_archive(archive, &ar) )
     return FALSE;
 
-  if ( (s=Snew(ar, SIO_INPUT, &ar_entry_functions)) )
+  if ( (s=Snew(ar, SIO_INPUT|SIO_RECORDPOS, &ar_entry_functions)) )
     return PL_unify_stream(stream, s);
 
   return PL_resource_error("memory");
