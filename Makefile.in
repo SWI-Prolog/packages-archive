@@ -13,6 +13,8 @@ PACKAGE=archive
 DOC=archive
 include ../Makefile.defs
 
+# COFLAGS=-gdwarf-2 -g3
+
 LIBPL=		@ARCHIVE_PLTARGETS@
 TARGETS=	@ARCHIVE_TARGETS@
 
