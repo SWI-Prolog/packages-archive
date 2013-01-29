@@ -20,6 +20,7 @@ archive.ind
 *.so
 *.dll
 *.dylib
+*.dSYM
 *.manifest
 *.exp
 *.ilk
