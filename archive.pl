@@ -151,6 +151,9 @@ archive_open(File, Archive, Options) :-
 %	  True when entry was last modified at time.
 %	  * size(-Bytes)
 %	  True when entry is Bytes long.
+%	  * link_target(-Target)
+%	  Target for a link. Currently only supported for symbolic
+%	  links.
 
 archive_header_property(Archive, Property) :-
 	(   nonvar(Property)
@@ -160,6 +163,9 @@ archive_header_property(Archive, Property) :-
 	archive_header_prop_(Archive, Property).
 
 header_property(filetype(_)).
+header_property(mtime(_)).
+header_property(size(_)).
+header_property(link_target(_)).
 
 
 %%	archive_extract(+ArchiveFile, +Dir, +Options)

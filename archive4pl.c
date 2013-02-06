@@ -118,6 +118,7 @@ static functor_t FUNCTOR_archive_error2;
 static functor_t FUNCTOR_filetype1;
 static functor_t FUNCTOR_mtime1;
 static functor_t FUNCTOR_size1;
+static functor_t FUNCTOR_link_target1;
 
 		 /*******************************
 		 *	  SYMBOL WRAPPER	*
@@ -617,6 +618,24 @@ archive_header_prop(term_t archive, term_t field)
     _PL_get_arg(1, field, arg);
 
     return PL_unify_int64(arg, size);
+  } else if ( prop == FUNCTOR_link_target1 )
+  { __LA_MODE_T type = archive_entry_filetype(ar->entry);
+    const wchar_t *target = NULL;
+
+    switch(type&AE_IFMT)
+    { case AE_IFLNK:
+	target = archive_entry_symlink_w(ar->entry);
+        break;
+    }
+
+    if ( target )
+    { term_t arg = PL_new_term_ref();
+      _PL_get_arg(1, field, arg);
+
+      return PL_unify_wchars(arg, PL_ATOM, (size_t)-1, target);
+    }
+
+    return FALSE;
   }
 
   return PL_domain_error("archive_header_property", field);
@@ -722,6 +741,7 @@ install_archive4pl(void)
   MKFUNCTOR(filetype,      1);
   MKFUNCTOR(mtime,         1);
   MKFUNCTOR(size,          1);
+  MKFUNCTOR(link_target,   1);
 
   PL_register_foreign("archive_open_stream",  3, archive_open_stream, 0);
   PL_register_foreign("archive_close",        1, archive_close,       0);
