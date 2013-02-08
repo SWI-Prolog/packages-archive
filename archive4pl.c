@@ -76,6 +76,7 @@ typedef struct archive_wrapper
   int			magic;		/* magic code */
   ar_status		status;		/* Current status */
   int			close_parent;	/* Close the parent handle */
+  int			closed_archive;	/* Archive was closed with open entry */
   struct archive *	archive;	/* Actual archive handle */
   struct archive_entry *entry;		/* Current entry */
 } archive_wrapper;
@@ -560,7 +561,11 @@ archive_close(term_t archive)
   if ( !get_archive(archive, &ar) )
     return FALSE;
 
-  if ( (rc=archive_read_finish(ar->archive)) == ARCHIVE_OK )
+  if ( ar->status == AR_OPENED_ENTRY )
+  { ar->closed_archive = TRUE;
+
+    return TRUE;
+  } else if ( (rc=archive_read_finish(ar->archive)) == ARCHIVE_OK )
   { ar->entry = NULL;
     ar->archive = NULL;
     ar->symbol = 0;
@@ -658,6 +663,13 @@ ar_close_entry(void *handle)
 { archive_wrapper *ar = handle;
 
   ar->status = AR_CLOSED_ENTRY;
+  if ( ar->closed_archive )
+  { archive_read_finish(ar->archive);
+    ar->entry = NULL;
+    ar->archive = NULL;
+    ar->symbol = 0;
+  }
+
   return 0;
 }
 
@@ -693,7 +705,9 @@ archive_open_entry(term_t archive, term_t stream)
     return FALSE;
 
   if ( (s=Snew(ar, SIO_INPUT|SIO_RECORDPOS, &ar_entry_functions)) )
+  { ar->status = AR_OPENED_ENTRY;
     return PL_unify_stream(stream, s);
+  }
 
   return PL_resource_error("memory");
 }

@@ -114,7 +114,20 @@ archive_open(File, Archive, Options) :-
 %%	archive_close(+Archive) is det.
 %
 %	Close the archive.  If  close_parent(true)   is  specified,  the
-%	underlying stream is closed too.
+%	underlying stream is closed too.  If   there  is an entry opened
+%	with  archive_open_entry/2,  actually  closing  the  archive  is
+%	delayed until the stream associated with   the  entry is closed.
+%	This can be used to open a   stream  to an archive entry without
+%	having to worry about closing the archive:
+%
+%	  ==
+%	  archive_open_named(ArchiveFile, EntryName, Stream) :-
+%	      archive_open(ArchiveFile, Handle, []),
+%	      archive_next_header(Handle, Name),
+%	      archive_open_entry(Handle, Stream),
+%	      archive_close(Archive).
+%	  ==
+
 
 %%	archive_next_header(+Handle, -Name) is semidet.
 %
