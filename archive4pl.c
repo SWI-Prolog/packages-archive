@@ -131,9 +131,12 @@ acquire_archive(atom_t symbol)
   ar->symbol = symbol;
 }
 
+
 static int
 release_archive(atom_t symbol)
 { archive_wrapper *ar = PL_blob_data(symbol, NULL, NULL);
+
+  assert(ar->symbol == 0);
 
   free_archive(ar);
   PL_free(ar);
@@ -662,7 +665,10 @@ static int
 ar_close_entry(void *handle)
 { archive_wrapper *ar = handle;
 
-  ar->status = AR_CLOSED_ENTRY;
+  if ( ar->status == AR_OPENED_ENTRY )
+  { PL_unregister_atom(ar->symbol);
+    ar->status = AR_CLOSED_ENTRY;
+  }
   if ( ar->closed_archive )
   { archive_read_finish(ar->archive);
     ar->entry = NULL;
@@ -706,7 +712,12 @@ archive_open_entry(term_t archive, term_t stream)
 
   if ( (s=Snew(ar, SIO_INPUT|SIO_RECORDPOS, &ar_entry_functions)) )
   { ar->status = AR_OPENED_ENTRY;
-    return PL_unify_stream(stream, s);
+    if ( PL_unify_stream(stream, s) )
+    { PL_register_atom(ar->symbol);	/* We may no longer reference the */
+      return TRUE;			/* archive itself */
+    }
+    Sclose(s);
+    return FALSE;
   }
 
   return PL_resource_error("memory");
