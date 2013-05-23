@@ -688,6 +688,9 @@ ar_control_entry(void *handle, int op, void *data)
   switch(op)
   { case SIO_SETENCODING:
       return 0;				/* allow switching encoding */
+    case SIO_GETSIZE:
+      *((int64_t*)data) = archive_entry_size(ar->entry);
+      return 0;
     default:
       return -1;
   }
