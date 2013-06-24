@@ -40,6 +40,7 @@ security and platform dependency.
 \newpage
 
 \section{Motivation}
+\label{sec:archive-motivation}
 
 Archives play two roles: they combine multiple documents into a single
 one and they typically provide compression and sometimes encryption or
@@ -77,6 +78,7 @@ materialising data using temporary files.
 \input{archive4pl.tex}
 
 \section{Status}
+\label{sec:archive-status}
 
 The current version is merely a proof-of-concept. It lacks writing
 archives and does not support many of the options of the underlying
