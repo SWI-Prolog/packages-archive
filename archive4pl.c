@@ -241,8 +241,12 @@ ar_read(struct archive *a, void *cdata, const void **buffer)
   }
 }
 
-static off_t
-ar_skip(struct archive *a, void *cdata, off_t request)
+#ifndef __LA_INT64_T
+#define __LA_INT64_T off_t
+#endif
+
+static __LA_INT64_T
+ar_skip(struct archive *a, void *cdata, __LA_INT64_T request)
 { archive_wrapper *ar = cdata;
 
   if ( Sseek64(ar->data, request, SIO_SEEK_CUR) == 0 )
