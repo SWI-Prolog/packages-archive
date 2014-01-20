@@ -150,7 +150,7 @@ compare_archives(atom_t a, atom_t b)
   archive_wrapper *arb = PL_blob_data(b, NULL, NULL);
 
   return ( ara > arb ?  1 :
-	   arb < ara ? -1 : 0
+	   ara < arb ? -1 : 0
 	 );
 }
 
