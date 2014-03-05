@@ -49,6 +49,11 @@
 #define HAVE_ARCHIVE_READ_SUPPORT_FORMAT_RAW 1
 #define HAVE_ARCHIVE_READ_SUPPORT_FORMAT_TAR 1
 #define HAVE_ARCHIVE_READ_SUPPORT_FORMAT_ZIP 1
+#define HAVE_ARCHIVE_READ_CLOSE 1
+#endif
+
+#ifndef HAVE_ARCHIVE_READ_CLOSE
+#define archive_read_close(ar) archive_read_finish(ar)
 #endif
 
 
@@ -572,7 +577,7 @@ archive_close(term_t archive)
   { ar->closed_archive = TRUE;
 
     return TRUE;
-  } else if ( (rc=archive_read_finish(ar->archive)) == ARCHIVE_OK )
+  } else if ( (rc=archive_read_close(ar->archive)) == ARCHIVE_OK )
   { ar->entry = NULL;
     ar->archive = NULL;
     ar->symbol = 0;
@@ -674,7 +679,7 @@ ar_close_entry(void *handle)
     ar->status = AR_CLOSED_ENTRY;
   }
   if ( ar->closed_archive )
-  { archive_read_finish(ar->archive);
+  { archive_read_close(ar->archive);
     ar->entry = NULL;
     ar->archive = NULL;
     ar->symbol = 0;
