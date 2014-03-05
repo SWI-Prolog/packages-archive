@@ -129,8 +129,14 @@ static atom_t ATOM_all;
 static atom_t ATOM_bzip2;
 static atom_t ATOM_compress;
 static atom_t ATOM_gzip;
+static atom_t ATOM_grzip;
+static atom_t ATOM_lrzip;
+static atom_t ATOM_lzip;
 static atom_t ATOM_lzma;
+static atom_t ATOM_lzop;
 static atom_t ATOM_none;
+static atom_t ATOM_rpm;
+static atom_t ATOM_uu;
 static atom_t ATOM_xz;
 static atom_t ATOM_ar;
 static atom_t ATOM_cpio;
@@ -323,50 +329,68 @@ archive_error(archive_wrapper *ar)
 }
 
 
-#define	COMPRESS_ALL	  0x00ff
+#define	FILTER_ALL	  0x000000ff
 #ifdef HAVE_ARCHIVE_READ_SUPPORT_FILTER_BZIP2
-#define	COMPRESS_BZIP2	  0x0001
+#define	FILTER_BZIP2	  0x00000001
 #endif
 #ifdef HAVE_ARCHIVE_READ_SUPPORT_FILTER_COMPRESS
-#define	COMPRESS_COMPRESS 0x0002
+#define	FILTER_COMPRESS 0x00000002
 #endif
 #ifdef HAVE_ARCHIVE_READ_SUPPORT_FILTER_GZIP
-#define	COMPRESS_GZIP	  0x0004
+#define	FILTER_GZIP	  0x00000004
+#endif
+#ifdef HAVE_ARCHIVE_READ_SUPPORT_FILTER_GRZIP
+#define	FILTER_GRZIP	  0x00000008
+#endif
+#ifdef HAVE_ARCHIVE_READ_SUPPORT_FILTER_LRZIP
+#define	FILTER_LRZIP	  0x00000010
+#endif
+#ifdef HAVE_ARCHIVE_READ_SUPPORT_FILTER_LZIP
+#define	FILTER_LZIP	  0x00000020
 #endif
 #ifdef HAVE_ARCHIVE_READ_SUPPORT_FILTER_LZMA
-#define	COMPRESS_LZMA	  0x0008
+#define	FILTER_LZMA	  0x00000040
+#endif
+#ifdef HAVE_ARCHIVE_READ_SUPPORT_FILTER_LZOP
+#define	FILTER_LZOP	  0x00000080
 #endif
 #ifdef HAVE_ARCHIVE_READ_SUPPORT_FILTER_NONE
-#define	COMPRESS_NONE	  0x0010
+#define	FILTER_NONE	  0x00000100
+#endif
+#ifdef HAVE_ARCHIVE_READ_SUPPORT_FILTER_RPM
+#define	FILTER_RPM	  0x00000200
+#endif
+#ifdef HAVE_ARCHIVE_READ_SUPPORT_FILTER_UU
+#define	FILTER_UU	  0x00000400
 #endif
 #ifdef HAVE_ARCHIVE_READ_SUPPORT_FILTER_XZ
-#define	COMPRESS_XZ	  0x0020
+#define	FILTER_XZ	  0x00000800
 #endif
 
-#define FORMAT_ALL	  0xff00
+#define FORMAT_ALL	  0x00ff0000
 #ifdef HAVE_ARCHIVE_READ_SUPPORT_FORMAT_AR
-#define FORMAT_AR	  0x0100
+#define FORMAT_AR	  0x00010000
 #endif
 #ifdef HAVE_ARCHIVE_READ_SUPPORT_FORMAT_CPIO
-#define FORMAT_CPIO	  0x0200
+#define FORMAT_CPIO	  0x00020000
 #endif
 #ifdef HAVE_ARCHIVE_READ_SUPPORT_FORMAT_EMPTY
-#define FORMAT_EMPTY	  0x0400
+#define FORMAT_EMPTY	  0x00040000
 #endif
 #ifdef HAVE_ARCHIVE_READ_SUPPORT_FORMAT_ISO9660
-#define FORMAT_ISO9960	  0x0800
+#define FORMAT_ISO9960	  0x00080000
 #endif
 #ifdef HAVE_ARCHIVE_READ_SUPPORT_FORMAT_MTREE
-#define FORMAT_MTREE	  0x1000
+#define FORMAT_MTREE	  0x00100000
 #endif
 #ifdef HAVE_ARCHIVE_READ_SUPPORT_FORMAT_RAW
-#define FORMAT_RAW	  0x2000
+#define FORMAT_RAW	  0x00200000
 #endif
 #ifdef HAVE_ARCHIVE_READ_SUPPORT_FORMAT_TAR
-#define FORMAT_TAR	  0x4000
+#define FORMAT_TAR	  0x00400000
 #endif
 #ifdef HAVE_ARCHIVE_READ_SUPPORT_FORMAT_ZIP
-#define FORMAT_ZIP	  0x8000
+#define FORMAT_ZIP	  0x00800000
 #endif
 
 
@@ -415,30 +439,54 @@ archive_open_stream(term_t data, term_t handle, term_t options)
 	return FALSE;
 
       if ( c == ATOM_all )
-	ar->type |= COMPRESS_ALL;
-#ifdef COMPRESS_BZIP2
+	ar->type |= FILTER_ALL;
+#ifdef FILTER_BZIP2
       else if ( c == ATOM_bzip2 )
-	ar->type |= COMPRESS_BZIP2;
+	ar->type |= FILTER_BZIP2;
 #endif
-#ifdef COMPRESS_COMPRESS
+#ifdef FILTER_COMPRESS
       else if ( c == ATOM_compress )
-	ar->type |= COMPRESS_COMPRESS;
+	ar->type |= FILTER_COMPRESS;
 #endif
-#ifdef COMPRESS_GZIP
+#ifdef FILTER_GZIP
       else if ( c == ATOM_gzip )
-	ar->type |= COMPRESS_GZIP;
+	ar->type |= FILTER_GZIP;
 #endif
-#ifdef COMPRESS_LZMA
+#ifdef FILTER_GRZIP
+      else if ( c == ATOM_grzip )
+	ar->type |= FILTER_GRZIP;
+#endif
+#ifdef FILTER_LRZIP
+      else if ( c == ATOM_lrzip )
+	ar->type |= FILTER_LRZIP;
+#endif
+#ifdef FILTER_LZIP
+      else if ( c == ATOM_lzip )
+	ar->type |= FILTER_LZIP;
+#endif
+#ifdef FILTER_LZMA
       else if ( c == ATOM_lzma )
-	ar->type |= COMPRESS_LZMA;
+	ar->type |= FILTER_LZMA;
 #endif
-#ifdef COMPRESS_NONE
+#ifdef FILTER_LZOP
+      else if ( c == ATOM_lzop )
+	ar->type |= FILTER_LZOP;
+#endif
+#ifdef FILTER_NONE
       else if ( c == ATOM_none )
-	ar->type |= COMPRESS_NONE;
+	ar->type |= FILTER_NONE;
 #endif
-#ifdef COMPRESS_XZ
+#ifdef FILTER_RPM
+      else if ( c == ATOM_rpm )
+	ar->type |= FILTER_RPM;
+#endif
+#ifdef FILTER_UU
+      else if ( c == ATOM_uu )
+	ar->type |= FILTER_UU;
+#endif
+#ifdef FILTER_XZ
       else if ( c == ATOM_xz )
-	ar->type |= COMPRESS_XZ;
+	ar->type |= FILTER_XZ;
 #endif
       else
 	return PL_domain_error("compression", arg);
@@ -492,35 +540,53 @@ archive_open_stream(term_t data, term_t handle, term_t options)
   if ( !PL_get_nil_ex(tail) )
     return FALSE;
 
-  if ( !(ar->type & COMPRESS_ALL) )
-    ar->type |= COMPRESS_ALL;
+  if ( !(ar->type & FILTER_ALL) )
+    ar->type |= FILTER_ALL;
   if ( !(ar->type & FORMAT_ALL) )
     ar->type |= FORMAT_ALL;
 
   if ( !(ar->archive = archive_read_new()) )
     return PL_resource_error("memory");
 
-  if ( (ar->type & COMPRESS_ALL) == COMPRESS_ALL )
+  if ( (ar->type & FILTER_ALL) == FILTER_ALL )
   { archive_read_support_filter_all(ar->archive);
   } else
   {
-#ifdef COMPRESS_BZIP2
-    enable_type(ar, COMPRESS_BZIP2,    archive_read_support_filter_bzip2);
+#ifdef FILTER_BZIP2
+    enable_type(ar, FILTER_BZIP2,    archive_read_support_filter_bzip2);
 #endif
-#ifdef COMPRESS_COMPRESS
-    enable_type(ar, COMPRESS_COMPRESS, archive_read_support_filter_compress);
+#ifdef FILTER_COMPRESS
+    enable_type(ar, FILTER_COMPRESS, archive_read_support_filter_compress);
 #endif
-#ifdef COMPRESS_GZIP
-    enable_type(ar, COMPRESS_GZIP,     archive_read_support_filter_gzip);
+#ifdef FILTER_GZIP
+    enable_type(ar, FILTER_GZIP,     archive_read_support_filter_gzip);
 #endif
-#ifdef COMPRESS_LZMA
-    enable_type(ar, COMPRESS_LZMA,     archive_read_support_filter_lzma);
+#ifdef FILTER_GRZIP
+    enable_type(ar, FILTER_GRZIP,     archive_read_support_filter_grzip);
 #endif
-#ifdef COMPRESS_NONE
-    enable_type(ar, COMPRESS_NONE,     archive_read_support_filter_none);
+#ifdef FILTER_LRZIP
+    enable_type(ar, FILTER_LRZIP,     archive_read_support_filter_lrzip);
 #endif
-#ifdef COMPRESS_XZ
-    enable_type(ar, COMPRESS_XZ,       archive_read_support_filter_xz);
+#ifdef FILTER_LZIP
+    enable_type(ar, FILTER_LZIP,     archive_read_support_filter_lzip);
+#endif
+#ifdef FILTER_LZMA
+    enable_type(ar, FILTER_LZMA,     archive_read_support_filter_lzma);
+#endif
+#ifdef FILTER_LZOP
+    enable_type(ar, FILTER_LZOP,     archive_read_support_filter_lzop);
+#endif
+#ifdef FILTER_NONE
+    enable_type(ar, FILTER_NONE,     archive_read_support_filter_none);
+#endif
+#ifdef FILTER_RPM
+    enable_type(ar, FILTER_RPM,      archive_read_support_filter_rpm);
+#endif
+#ifdef FILTER_UU
+    enable_type(ar, FILTER_UU,       archive_read_support_filter_uu);
+#endif
+#ifdef FILTER_XZ
+    enable_type(ar, FILTER_XZ,       archive_read_support_filter_xz);
 #endif
   }
 
@@ -783,8 +849,14 @@ install_archive4pl(void)
   MKATOM(bzip2);
   MKATOM(compress);
   MKATOM(gzip);
+  MKATOM(grzip);
+  MKATOM(lrzip);
+  MKATOM(lzip);
   MKATOM(lzma);
+  MKATOM(lzop);
   MKATOM(none);
+  MKATOM(rpm);
+  MKATOM(uu);
   MKATOM(xz);
   MKATOM(ar);
   MKATOM(cpio);
