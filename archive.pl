@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@cs.vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 2012, VU University Amsterdam
+    Copyright (C): 2012-2014, VU University Amsterdam
 
     This program is free software; you can redistribute it and/or
     modify it under the terms of the GNU General Public License
@@ -76,18 +76,23 @@ The following example lists the entries in an archive:
 %	  if archive_close/1 is called on Archive.
 %
 %	  * compression(+Compression)
-%	  Support the indicated compression. This option may be used
-%	  multiple times to support multiple compression types.
-%	  If no compression options are provided, =all= is assumed.
+%	  Synomym for filter(Compression).  Deprecated.
+%
+%	  * filter(+Filter)
+%	  Support the indicated filter. This option may be
+%	  used multiple times to support multiple filters. If
+%	  no filter options are provided, =all= is assumed.
 %	  Supported values are =all=, =bzip2=, =compress=, =gzip=,
-%	  =lzma=, =none= and =xz=.  The value =all= is default.
+%	  =grzip=, =lrzip=, =lzip=, =lzma=, =lzop=, =none=, =rpm=, =uu=
+%	  and =xz=. The value =all= is default.
 %
 %	  * format(+Format)
 %	  Support the indicated format.  This option may be used
 %	  multiple times to support multiple formats. If no format
 %	  options are provided, =all= is assumed. Supported values are:
-%	  =all=, =ar=, =cpio=, =empty=, =iso9660=, =mtree=, =raw=,
-%	  =tar= and =zip=.  The value =all= is default.
+%	  =all=, =7zip=, =ar=, =cab=, =cpio=, =empty=,
+%	  =gnutar=, =iso9660=, =lha=, =mtree=, =rar=, =raw=, =tar=,
+%	  =xar= and =zip=. The value =all= is default.
 %
 %	Note that the actually supported   compression types and formats
 %	may vary depending on the version   and  installation options of
@@ -95,8 +100,8 @@ The following example lists the entries in an archive:
 %	domain  error  if  the  (explicitly)  requested  format  is  not
 %	supported.
 %
-%	@error	domain_error(compression, Compression) if the requested
-%		compression type is not supported.
+%	@error	domain_error(filter, Filter) if the requested
+%		filter is not supported.
 %	@error	domain_error(format, Format) if the requested
 %		format type is not supported.
 

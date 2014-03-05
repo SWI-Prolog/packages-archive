@@ -124,6 +124,7 @@ static void free_archive(archive_wrapper *ar);
 
 static atom_t ATOM_close_parent;
 static atom_t ATOM_compression;
+static atom_t ATOM_filter;
 static atom_t ATOM_format;
 static atom_t ATOM_all;
 static atom_t ATOM_bzip2;
@@ -456,7 +457,7 @@ archive_open_stream(term_t data, term_t handle, term_t options)
     if ( !PL_get_name_arity(head, &name, &arity) ||
 	 !PL_get_arg(1, head, arg) )
       return PL_type_error("option", head);
-    if ( name == ATOM_compression )
+    if ( name == ATOM_compression || name == ATOM_filter )
     { atom_t c;
 
       if ( !PL_get_atom_ex(arg, &c) )
@@ -910,6 +911,7 @@ install_t
 install_archive4pl(void)
 { MKATOM(close_parent);
   MKATOM(compression);
+  MKATOM(filter);
   MKATOM(format);
   MKATOM(all);
   MKATOM(bzip2);
