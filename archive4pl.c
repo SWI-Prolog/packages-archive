@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@uva.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 2012, VU University Amsterdam
+    Copyright (C): 2012-2014, VU University Amsterdam
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public
@@ -55,6 +55,35 @@
 #ifndef HAVE_ARCHIVE_READ_CLOSE
 #define archive_read_close(ar) archive_read_finish(ar)
 #endif
+
+#if ARCHIVE_VERSION_NUMBER < 3000000
+#define archive_read_support_filter_all archive_read_support_compression_all
+
+#ifdef HAVE_ARCHIVE_READ_SUPPORT_COMPRESSION_BZIP2
+#define HAVE_ARCHIVE_READ_SUPPORT_FILTER_BZIP2 1
+#define archive_read_support_filter_bzip2 archive_read_support_compression_bzip2
+#endif
+#ifdef HAVE_ARCHIVE_READ_SUPPORT_COMPRESSION_COMPRESS
+#define HAVE_ARCHIVE_READ_SUPPORT_FILTER_COMPRESS
+#define archive_read_support_filter_compress archive_read_support_compression_compress
+#endif
+#ifdef HAVE_ARCHIVE_READ_SUPPORT_COMPRESSION_GZIP
+#define HAVE_ARCHIVE_READ_SUPPORT_FILTER_GZIP
+#define archive_read_support_filter_gzip archive_read_support_compression_gzip
+#endif
+#ifdef HAVE_ARCHIVE_READ_SUPPORT_COMPRESSION_LZMA
+#define HAVE_ARCHIVE_READ_SUPPORT_FILTER_LZMA
+#define archive_read_support_filter_lzma archive_read_support_compression_lzma
+#endif
+#ifdef HAVE_ARCHIVE_READ_SUPPORT_COMPRESSION_NONE
+#define HAVE_ARCHIVE_READ_SUPPORT_FILTER_NONE
+#define archive_read_support_filter_none archive_read_support_compression_none
+#endif
+#ifdef HAVE_ARCHIVE_READ_SUPPORT_COMPRESSION_XZ
+#define HAVE_ARCHIVE_READ_SUPPORT_FILTER_XZ
+#define archive_read_support_filter_xz archive_read_support_compression_xz
+#endif
+#endif /*ARCHIVE_VERSION_NUMBER < 3000000*/
 
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -295,22 +324,22 @@ archive_error(archive_wrapper *ar)
 
 
 #define	COMPRESS_ALL	  0x00ff
-#ifdef HAVE_ARCHIVE_READ_SUPPORT_COMPRESSION_BZIP2
+#ifdef HAVE_ARCHIVE_READ_SUPPORT_FILTER_BZIP2
 #define	COMPRESS_BZIP2	  0x0001
 #endif
-#ifdef HAVE_ARCHIVE_READ_SUPPORT_COMPRESSION_COMPRESS
+#ifdef HAVE_ARCHIVE_READ_SUPPORT_FILTER_COMPRESS
 #define	COMPRESS_COMPRESS 0x0002
 #endif
-#ifdef HAVE_ARCHIVE_READ_SUPPORT_COMPRESSION_GZIP
+#ifdef HAVE_ARCHIVE_READ_SUPPORT_FILTER_GZIP
 #define	COMPRESS_GZIP	  0x0004
 #endif
-#ifdef HAVE_ARCHIVE_READ_SUPPORT_COMPRESSION_LZMA
+#ifdef HAVE_ARCHIVE_READ_SUPPORT_FILTER_LZMA
 #define	COMPRESS_LZMA	  0x0008
 #endif
-#ifdef HAVE_ARCHIVE_READ_SUPPORT_COMPRESSION_NONE
+#ifdef HAVE_ARCHIVE_READ_SUPPORT_FILTER_NONE
 #define	COMPRESS_NONE	  0x0010
 #endif
-#ifdef HAVE_ARCHIVE_READ_SUPPORT_COMPRESSION_XZ
+#ifdef HAVE_ARCHIVE_READ_SUPPORT_FILTER_XZ
 #define	COMPRESS_XZ	  0x0020
 #endif
 
@@ -472,26 +501,26 @@ archive_open_stream(term_t data, term_t handle, term_t options)
     return PL_resource_error("memory");
 
   if ( (ar->type & COMPRESS_ALL) == COMPRESS_ALL )
-  { archive_read_support_compression_all(ar->archive);
+  { archive_read_support_filter_all(ar->archive);
   } else
   {
 #ifdef COMPRESS_BZIP2
-    enable_type(ar, COMPRESS_BZIP2,    archive_read_support_compression_bzip2);
+    enable_type(ar, COMPRESS_BZIP2,    archive_read_support_filter_bzip2);
 #endif
 #ifdef COMPRESS_COMPRESS
-    enable_type(ar, COMPRESS_COMPRESS, archive_read_support_compression_compress);
+    enable_type(ar, COMPRESS_COMPRESS, archive_read_support_filter_compress);
 #endif
 #ifdef COMPRESS_GZIP
-    enable_type(ar, COMPRESS_GZIP,     archive_read_support_compression_gzip);
+    enable_type(ar, COMPRESS_GZIP,     archive_read_support_filter_gzip);
 #endif
 #ifdef COMPRESS_LZMA
-    enable_type(ar, COMPRESS_LZMA,     archive_read_support_compression_lzma);
+    enable_type(ar, COMPRESS_LZMA,     archive_read_support_filter_lzma);
 #endif
 #ifdef COMPRESS_NONE
-    enable_type(ar, COMPRESS_NONE,     archive_read_support_compression_none);
+    enable_type(ar, COMPRESS_NONE,     archive_read_support_filter_none);
 #endif
 #ifdef COMPRESS_XZ
-    enable_type(ar, COMPRESS_XZ,       archive_read_support_compression_xz);
+    enable_type(ar, COMPRESS_XZ,       archive_read_support_filter_xz);
 #endif
   }
 
