@@ -108,7 +108,7 @@ archive_open(Stream, Archive, Options) :-
 archive_open(File, Archive, Options) :-
 	open(File, read, Stream, [type(binary)]),
 	catch(archive_open_stream(Stream, Archive, [close_parent(true)|Options]),
-	      E, (close(Stream), throw(E))).
+	      E, (close(Stream, [force(true)]), throw(E))).
 
 
 %%	archive_close(+Archive) is det.
