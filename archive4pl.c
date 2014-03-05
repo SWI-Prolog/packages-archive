@@ -138,13 +138,19 @@ static atom_t ATOM_none;
 static atom_t ATOM_rpm;
 static atom_t ATOM_uu;
 static atom_t ATOM_xz;
+static atom_t ATOM_7zip;
 static atom_t ATOM_ar;
+static atom_t ATOM_cab;
 static atom_t ATOM_cpio;
 static atom_t ATOM_empty;
+static atom_t ATOM_gnutar;
 static atom_t ATOM_iso9960;
+static atom_t ATOM_lha;
 static atom_t ATOM_mtree;
+static atom_t ATOM_rar;
 static atom_t ATOM_raw;
 static atom_t ATOM_tar;
+static atom_t ATOM_xar;
 static atom_t ATOM_zip;
 static atom_t ATOM_file;
 static atom_t ATOM_link;
@@ -368,29 +374,47 @@ archive_error(archive_wrapper *ar)
 #endif
 
 #define FORMAT_ALL	  0x00ff0000
+#ifdef HAVE_ARCHIVE_READ_SUPPORT_FORMAT_7ZIP
+#define FORMAT_7ZIP	  0x00010000
+#endif
 #ifdef HAVE_ARCHIVE_READ_SUPPORT_FORMAT_AR
-#define FORMAT_AR	  0x00010000
+#define FORMAT_AR	  0x00020000
+#endif
+#ifdef HAVE_ARCHIVE_READ_SUPPORT_FORMAT_CAB
+#define FORMAT_CAB	  0x00040000
 #endif
 #ifdef HAVE_ARCHIVE_READ_SUPPORT_FORMAT_CPIO
-#define FORMAT_CPIO	  0x00020000
+#define FORMAT_CPIO	  0x00080000
 #endif
 #ifdef HAVE_ARCHIVE_READ_SUPPORT_FORMAT_EMPTY
-#define FORMAT_EMPTY	  0x00040000
+#define FORMAT_EMPTY	  0x00100000
+#endif
+#ifdef HAVE_ARCHIVE_READ_SUPPORT_FORMAT_GNUTAR
+#define FORMAT_GNUTAR	  0x00200000
 #endif
 #ifdef HAVE_ARCHIVE_READ_SUPPORT_FORMAT_ISO9660
-#define FORMAT_ISO9960	  0x00080000
+#define FORMAT_ISO9960	  0x00400000
+#endif
+#ifdef HAVE_ARCHIVE_READ_SUPPORT_FORMAT_LHA
+#define FORMAT_LHA	  0x00800000
 #endif
 #ifdef HAVE_ARCHIVE_READ_SUPPORT_FORMAT_MTREE
-#define FORMAT_MTREE	  0x00100000
+#define FORMAT_MTREE	  0x01000000
+#endif
+#ifdef HAVE_ARCHIVE_READ_SUPPORT_FORMAT_RAR
+#define FORMAT_RAR	  0x02000000
 #endif
 #ifdef HAVE_ARCHIVE_READ_SUPPORT_FORMAT_RAW
-#define FORMAT_RAW	  0x00200000
+#define FORMAT_RAW	  0x04000000
 #endif
 #ifdef HAVE_ARCHIVE_READ_SUPPORT_FORMAT_TAR
-#define FORMAT_TAR	  0x00400000
+#define FORMAT_TAR	  0x08000000
+#endif
+#ifdef HAVE_ARCHIVE_READ_SUPPORT_FORMAT_XAR
+#define FORMAT_XAR	  0x10000000
 #endif
 #ifdef HAVE_ARCHIVE_READ_SUPPORT_FORMAT_ZIP
-#define FORMAT_ZIP	  0x00800000
+#define FORMAT_ZIP	  0x20000000
 #endif
 
 
@@ -489,7 +513,7 @@ archive_open_stream(term_t data, term_t handle, term_t options)
 	ar->type |= FILTER_XZ;
 #endif
       else
-	return PL_domain_error("compression", arg);
+	return PL_domain_error("filter", arg);
     } else if ( name == ATOM_format )
     { atom_t f;
 
@@ -498,9 +522,17 @@ archive_open_stream(term_t data, term_t handle, term_t options)
 
       if ( f == ATOM_all )
 	ar->type |= FORMAT_ALL;
+#ifdef FORMAT_7ZIP
+      else if ( f == ATOM_7zip )
+	ar->type |= FORMAT_7ZIP;
+#endif
 #ifdef FORMAT_AR
       else if ( f == ATOM_ar )
 	ar->type |= FORMAT_AR;
+#endif
+#ifdef FORMAT_CAB
+      else if ( f == ATOM_cab )
+	ar->type |= FORMAT_CAB;
 #endif
 #ifdef FORMAT_CPIO
       else if ( f == ATOM_cpio )
@@ -510,13 +542,25 @@ archive_open_stream(term_t data, term_t handle, term_t options)
       else if ( f == ATOM_empty )
 	ar->type |= FORMAT_EMPTY;
 #endif
+#ifdef FORMAT_GNUTAR
+      else if ( f == ATOM_gnutar )
+	ar->type |= FORMAT_GNUTAR;
+#endif
 #ifdef FORMAT_ISO9960
       else if ( f == ATOM_iso9960 )
 	ar->type |= FORMAT_ISO9960;
 #endif
+#ifdef FORMAT_LHA
+      else if ( f == ATOM_lha )
+	ar->type |= FORMAT_LHA;
+#endif
 #ifdef FORMAT_MTREE
       else if ( f == ATOM_mtree )
 	ar->type |= FORMAT_MTREE;
+#endif
+#ifdef FORMAT_RAR
+      else if ( f == ATOM_rar )
+	ar->type |= FORMAT_RAR;
 #endif
 #ifdef FORMAT_RAW
       else if ( f == ATOM_raw )
@@ -525,6 +569,10 @@ archive_open_stream(term_t data, term_t handle, term_t options)
 #ifdef FORMAT_TAR
       else if ( f == ATOM_tar )
 	ar->type |= FORMAT_TAR;
+#endif
+#ifdef FORMAT_XAR
+      else if ( f == ATOM_xar )
+	ar->type |= FORMAT_XAR;
 #endif
 #ifdef FORMAT_ZIP
       else if ( f == ATOM_zip )
@@ -594,8 +642,14 @@ archive_open_stream(term_t data, term_t handle, term_t options)
   { archive_read_support_format_all(ar->archive);
   } else
   {
+#ifdef FORMAT_7ZIP
+    enable_type(ar, FORMAT_7ZIP,    archive_read_support_format_7zip);
+#endif
 #ifdef FORMAT_AR
     enable_type(ar, FORMAT_AR,      archive_read_support_format_ar);
+#endif
+#ifdef FORMAT_CAB
+    enable_type(ar, FORMAT_CAB,     archive_read_support_format_cab);
 #endif
 #ifdef FORMAT_CPIO
     enable_type(ar, FORMAT_CPIO,    archive_read_support_format_cpio);
@@ -603,17 +657,29 @@ archive_open_stream(term_t data, term_t handle, term_t options)
 #ifdef FORMAT_EMPTY
     enable_type(ar, FORMAT_EMPTY,   archive_read_support_format_empty);
 #endif
+#ifdef FORMAT_GNUTAR
+    enable_type(ar, FORMAT_GNUTAR,  archive_read_support_format_gnutar);
+#endif
 #ifdef FORMAT_ISO9960
     enable_type(ar, FORMAT_ISO9960, archive_read_support_format_iso9660);
 #endif
+#ifdef FORMAT_LHA
+    enable_type(ar, FORMAT_LHA,     archive_read_support_format_lha);
+#endif
 #ifdef FORMAT_MTREE
     enable_type(ar, FORMAT_MTREE,   archive_read_support_format_mtree);
+#endif
+#ifdef FORMAT_RAR
+    enable_type(ar, FORMAT_RAR,     archive_read_support_format_rar);
 #endif
 #ifdef FORMAT_RAW
     enable_type(ar, FORMAT_RAW,     archive_read_support_format_raw);
 #endif
 #ifdef FORMAT_TAR
     enable_type(ar, FORMAT_TAR,     archive_read_support_format_tar);
+#endif
+#ifdef FORMAT_XAR
+    enable_type(ar, FORMAT_XAR,     archive_read_support_format_xar);
 #endif
 #ifdef FORMAT_ZIP
     enable_type(ar, FORMAT_ZIP,     archive_read_support_format_zip);
@@ -858,13 +924,19 @@ install_archive4pl(void)
   MKATOM(rpm);
   MKATOM(uu);
   MKATOM(xz);
+  ATOM_7zip = PL_new_atom("7zip");
   MKATOM(ar);
+  MKATOM(cab);
   MKATOM(cpio);
   MKATOM(empty);
+  MKATOM(gnutar);
   MKATOM(iso9960);
+  MKATOM(lha);
   MKATOM(mtree);
+  MKATOM(rar);
   MKATOM(raw);
   MKATOM(tar);
+  MKATOM(xar);
   MKATOM(zip);
   MKATOM(file);
   MKATOM(link);
