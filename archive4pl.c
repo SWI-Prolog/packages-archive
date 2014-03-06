@@ -106,7 +106,7 @@ typedef enum ar_status
 typedef struct archive_wrapper
 { atom_t		symbol;		/* Associated symbol */
   IOSTREAM *		data;		/* Input data */
-  unsigned short	type;		/* Type of format supported */
+  unsigned int		type;		/* Type of format supported */
   int			magic;		/* magic code */
   ar_status		status;		/* Current status */
   int			close_parent;	/* Close the parent handle */
@@ -336,7 +336,7 @@ archive_error(archive_wrapper *ar)
 }
 
 
-#define	FILTER_ALL	  0x000000ff
+#define	FILTER_ALL	  0x0000ffff
 #ifdef HAVE_ARCHIVE_READ_SUPPORT_FILTER_BZIP2
 #define	FILTER_BZIP2	  0x00000001
 #endif
@@ -374,7 +374,6 @@ archive_error(archive_wrapper *ar)
 #define	FILTER_XZ	  0x00000800
 #endif
 
-#define FORMAT_ALL	  0x00ff0000
 #ifdef HAVE_ARCHIVE_READ_SUPPORT_FORMAT_7ZIP
 #define FORMAT_7ZIP	  0x00010000
 #endif
@@ -418,6 +417,8 @@ archive_error(archive_wrapper *ar)
 #define FORMAT_ZIP	  0x20000000
 #endif
 
+#define FORMAT_MASK	  0xffff0000
+#define FORMAT_ALL	  (FORMAT_MASK&~FORMAT_RAW)
 
 static void
 enable_type(archive_wrapper *ar, int type,
@@ -591,7 +592,7 @@ archive_open_stream(term_t data, term_t handle, term_t options)
 
   if ( !(ar->type & FILTER_ALL) )
     ar->type |= FILTER_ALL;
-  if ( !(ar->type & FORMAT_ALL) )
+  if ( !(ar->type & FORMAT_MASK) )
     ar->type |= FORMAT_ALL;
 
   if ( !(ar->archive = archive_read_new()) )
@@ -641,6 +642,9 @@ archive_open_stream(term_t data, term_t handle, term_t options)
 
   if ( (ar->type & FORMAT_ALL) == FORMAT_ALL )
   { archive_read_support_format_all(ar->archive);
+#ifdef FORMAT_RAW
+    enable_type(ar, FORMAT_RAW,     archive_read_support_format_raw);
+#endif
   } else
   {
 #ifdef FORMAT_7ZIP

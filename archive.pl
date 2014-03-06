@@ -70,7 +70,8 @@ The following example lists the entries in an archive:
 %	archive is closed using archive_close/1.  For other options, the
 %	defaults are typically fine. The option format(raw) must be used
 %	to process compressed  streams  that   do  not  contain explicit
-%	entries (e.g., gzip'ed data) unambibuously.
+%	entries (e.g., gzip'ed data)  unambibuously.   The  =raw= format
+%	creates a _pseudo archive_ holding a single member named =data=.
 %
 %	  * close_parent(+Boolean)
 %	  If this option is =true= (default =false=), Stream is closed
@@ -90,10 +91,13 @@ The following example lists the entries in an archive:
 %	  * format(+Format)
 %	  Support the indicated format.  This option may be used
 %	  multiple times to support multiple formats. If no format
-%	  options are provided, =all= is assumed. Supported values are:
-%	  =all=, =7zip=, =ar=, =cab=, =cpio=, =empty=,
-%	  =gnutar=, =iso9660=, =lha=, =mtree=, =rar=, =raw=, =tar=,
-%	  =xar= and =zip=. The value =all= is default.
+%	  options are provided, =all= is assumed. Note that
+%	  =all= does *not* include =raw=. To open both archive
+%	  and non-archive files, _both_ format(all) and
+%	  format(raw) must be specified. Supported values are: =all=,
+%	  =7zip=, =ar=, =cab=, =cpio=, =empty=, =gnutar=, =iso9660=,
+%	  =lha=, =mtree=, =rar=, =raw=, =tar=, =xar= and =zip=. The
+%	  value =all= is default.
 %
 %	Note that the actually supported   compression types and formats
 %	may vary depending on the version   and  installation options of
