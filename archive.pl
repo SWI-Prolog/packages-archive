@@ -30,6 +30,7 @@
 :- module(archive,
 	  [ archive_open/3,		% +Stream, -Archive, +Options
 	    archive_close/1,		% +Archive
+	    archive_property/2,		% +Archive, ?Property
 	    archive_next_header/2,	% +Archive, -Name
 	    archive_open_entry/2,	% +Archive, -EntryStream
 	    archive_header_property/2,	% +Archive, ?Property
@@ -132,6 +133,26 @@ archive_open(File, Archive, Options) :-
 %	      archive_open_entry(Handle, Stream),
 %	      archive_close(Archive).
 %	  ==
+
+
+%%	archive_property(+Handle, ?Property) is nondet.
+%
+%	True when Property is a property  of the archive Handle. Defined
+%	properties are:
+%
+%	  * format(Format)
+%	  True when the archive has the specified format.
+%	  * filters(List)
+%	  True when the indicated filters are applied before reaching
+%	  the archive format.
+
+archive_property(Handle, Property) :-
+	defined_archive_property(Property),
+	Property =.. [Name,Value],
+	archive_property(Handle, Name, Value).
+
+defined_archive_property(format(_)).
+defined_archive_property(filter(_)).
 
 
 %%	archive_next_header(+Handle, -Name) is semidet.

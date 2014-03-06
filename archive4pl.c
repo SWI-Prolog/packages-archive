@@ -698,6 +698,39 @@ archive_open_stream(term_t data, term_t handle, term_t options)
 }
 
 
+static foreign_t
+archive_property(term_t archive, term_t prop, term_t value)
+{ archive_wrapper *ar;
+  atom_t pn;
+  const char *s;
+
+  if ( !get_archive(archive, &ar) ||
+       !PL_get_atom_ex(prop, &pn) )
+    return FALSE;
+
+  if ( pn == ATOM_filter )
+  { int i, fcount = archive_filter_count(ar->archive);
+    term_t tail = PL_copy_term_ref(value);
+    term_t head = PL_new_term_ref();
+
+    for(i=0; i<fcount; i++)
+    { s = archive_filter_name(ar->archive, i);
+
+      if ( !s || strcmp(s, "none") == 0 )
+	continue;
+
+      if ( !PL_unify_list(tail, head, tail) ||
+	   !PL_unify_atom_chars(head, s) )
+	return FALSE;
+    }
+    return PL_unify_nil(tail);
+  } else if ( pn == ATOM_format &&
+	      (s=archive_format_name(ar->archive)) )
+  { return PL_unify_atom_chars(value, s);
+  }
+
+  return FALSE;
+}
 
 
 static foreign_t
@@ -956,6 +989,7 @@ install_archive4pl(void)
   MKFUNCTOR(link_target,   1);
 
   PL_register_foreign("archive_open_stream",  3, archive_open_stream, 0);
+  PL_register_foreign("archive_property",     3, archive_property,    0);
   PL_register_foreign("archive_close",        1, archive_close,       0);
   PL_register_foreign("archive_next_header",  2, archive_next_header, 0);
   PL_register_foreign("archive_header_prop_", 2, archive_header_prop, 0);
