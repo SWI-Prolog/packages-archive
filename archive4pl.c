@@ -184,8 +184,14 @@ acquire_archive(atom_t symbol)
 static int
 release_archive(atom_t symbol)
 { archive_wrapper *ar = PL_blob_data(symbol, NULL, NULL);
+  struct archive *a;
 
-  assert(ar->symbol == 0);
+  assert(ar->status != AR_OPENED_ENTRY);
+
+  if ( (a=ar->archive) )
+  { ar->archive = NULL;
+    archive_read_close(a);
+  }
 
   free_archive(ar);
   PL_free(ar);
