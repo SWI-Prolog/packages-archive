@@ -144,8 +144,6 @@ archive_open(File, Archive, Options) :-
 %	True when Property is a property  of the archive Handle. Defined
 %	properties are:
 %
-%	  * format(Format)
-%	  True when the archive has the specified format.
 %	  * filters(List)
 %	  True when the indicated filters are applied before reaching
 %	  the archive format.
@@ -155,7 +153,6 @@ archive_property(Handle, Property) :-
 	Property =.. [Name,Value],
 	archive_property(Handle, Name, Value).
 
-defined_archive_property(format(_)).
 defined_archive_property(filter(_)).
 
 
@@ -197,6 +194,10 @@ defined_archive_property(filter(_)).
 %	  * link_target(-Target)
 %	  Target for a link. Currently only supported for symbolic
 %	  links.
+%	  * format(-Format)
+%	  Provides the name of the archive format applicable to the
+%	  current entry.  The returned value is the lowercase version
+%	  of the output of archive_format_name().
 
 archive_header_property(Archive, Property) :-
 	(   nonvar(Property)
@@ -209,6 +210,7 @@ header_property(filetype(_)).
 header_property(mtime(_)).
 header_property(size(_)).
 header_property(link_target(_)).
+header_property(format(_)).
 
 
 %%	archive_extract(+ArchiveFile, +Dir, +Options)

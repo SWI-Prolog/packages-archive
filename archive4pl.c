@@ -31,6 +31,7 @@
 #include <assert.h>
 #include <string.h>
 #include <errno.h>
+#include <ctype.h>
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -164,6 +165,7 @@ static atom_t ATOM_fifo;
 static functor_t FUNCTOR_error2;
 static functor_t FUNCTOR_archive_error2;
 static functor_t FUNCTOR_filetype1;
+static functor_t FUNCTOR_format1;
 static functor_t FUNCTOR_mtime1;
 static functor_t FUNCTOR_size1;
 static functor_t FUNCTOR_link_target1;
@@ -728,9 +730,6 @@ archive_property(term_t archive, term_t prop, term_t value)
 	return FALSE;
     }
     return PL_unify_nil(tail);
-  } else if ( pn == ATOM_format &&
-	      (s=archive_format_name(ar->archive)) )
-  { return PL_unify_atom_chars(value, s);
   }
 
   return FALSE;
@@ -852,6 +851,22 @@ archive_header_prop(term_t archive, term_t field)
     }
 
     return FALSE;
+  } else if ( prop == FUNCTOR_format1 )
+  { const char *s = archive_format_name(ar->archive);
+
+    if ( s )
+    { char lwr[50];
+      char *o;
+      term_t arg = PL_new_term_ref();
+      _PL_get_arg(1, field, arg);
+
+      for(o=lwr; *s && o < lwr+sizeof(lwr); )
+	*o++ = tolower(*s++);
+
+      *o = '\0';
+
+      return PL_unify_atom_chars(arg, lwr);
+    }
   }
 
   return PL_domain_error("archive_header_property", field);
@@ -991,6 +1006,7 @@ install_archive4pl(void)
   MKFUNCTOR(mtime,         1);
   MKFUNCTOR(size,          1);
   MKFUNCTOR(link_target,   1);
+  MKFUNCTOR(format,        1);
 
   PL_register_foreign("archive_open_stream",  3, archive_open_stream, 0);
   PL_register_foreign("archive_property",     3, archive_property,    0);
