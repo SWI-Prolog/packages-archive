@@ -22,13 +22,14 @@
 
 \begin{abstract}
 The library \url[libarchive]{http://code.google.com/p/libarchive/}
-provides a portable way to access archive files. This package is a
-Prolog wrapper around this library. The motivation to introduce this
-library is twofold. In the first place, it provides a minimal platform
-independent API to access archives. In the second place, it allows
-accessing archives through Prolog streams, which often elimaniates the
-need for temporary files and all related consequences for performance,
-security and platform dependency.
+provides a portable way to access archive files as well as encoded
+(typically compressed) data. This package is a Prolog wrapper around
+this library. The motivation to introduce this library is twofold. In
+the first place, it provides a minimal platform independent API to
+access archives. In the second place, it allows accessing archives
+through Prolog streams, which often eliminates the need for temporary
+files and all related consequences for performance, security and
+platform dependency.
 \end{abstract}
 
 \pagebreak
@@ -53,7 +54,7 @@ It also provides compression by means of library(zlib).
 External archives may be accessed through the process interface provided
 by process_create/3, but this has disadvantages. The one that motivated
 this library was that using external processes provide no decent
-platform independent access to archives. Most likely zip files comes
+platform independent access to archives. Most likely zip files come
 closest to platform independent access, but there are many different
 programs for accessing zip files that provide slightly different sets of
 options and the existence of any of these programs cannot be guaranteed
