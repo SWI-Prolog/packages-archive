@@ -249,7 +249,7 @@ get_archive(term_t t, archive_wrapper **arp)
     return FALSE;
   }
 
-  return FALSE;
+  return PL_type_error("archive", t);
 }
 
 
