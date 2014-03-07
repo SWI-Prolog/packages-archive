@@ -306,6 +306,7 @@ ar_skip(struct archive *a, void *cdata, __LA_INT64_T request)
 
   if ( Sseek64(ar->data, request, SIO_SEEK_CUR) == 0 )
     return request;
+  Sclearerr(ar->data);
 
   return 0;				/* cannot skip; library will read */
 }
