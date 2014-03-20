@@ -91,7 +91,8 @@ AC_CHECK_FUNCS(archive_read_support_format_7zip \
 	       archive_read_support_format_xar \
 	       archive_read_support_format_zip)
 
-AC_CHECK_FUNCS(archive_read_close)
+AC_CHECK_FUNCS(archive_read_close \
+	       archive_filter_count)
 
 if test "$ARCHIVELIB" = yes; then
   ARCHIVE_TARGETS="archive4pl.$SO"

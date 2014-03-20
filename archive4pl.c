@@ -721,6 +721,7 @@ archive_property(term_t archive, term_t prop, term_t value)
        !PL_get_atom_ex(prop, &pn) )
     return FALSE;
 
+#ifdef HAVE_ARCHIVE_FILTER_COUNT
   if ( pn == ATOM_filter )
   { int i, fcount = archive_filter_count(ar->archive);
     term_t tail = PL_copy_term_ref(value);
@@ -738,6 +739,7 @@ archive_property(term_t archive, term_t prop, term_t value)
     }
     return PL_unify_nil(tail);
   }
+#endif
 
   return FALSE;
 }
