@@ -899,15 +899,19 @@ static int
 ar_close_entry(void *handle)
 { archive_wrapper *ar = handle;
 
-  if ( ar->status == AR_OPENED_ENTRY )
-  { PL_unregister_atom(ar->symbol);
-    ar->status = AR_CLOSED_ENTRY;
-  }
   if ( ar->closed_archive )
-  { archive_read_close(ar->archive);
+  { struct archive *a = ar->archive;
+
+    ar->archive = NULL;
     ar->entry = NULL;
     ar->archive = NULL;
     ar->symbol = 0;
+
+    archive_read_close(a);
+  }
+  if ( ar->status == AR_OPENED_ENTRY )
+  { PL_unregister_atom(ar->symbol);
+    ar->status = AR_CLOSED_ENTRY;
   }
 
   return 0;
