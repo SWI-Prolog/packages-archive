@@ -754,6 +754,8 @@ archive_next_header(term_t archive, term_t name)
     return FALSE;
   if ( ar->status == AR_NEW_ENTRY )
     archive_read_data_skip(ar->archive);
+  if ( ar->status == AR_OPENED_ENTRY )
+    return PL_permission_error("next_header", "archive", archive);
 
   while ( (rc=archive_read_next_header(ar->archive, &ar->entry)) == ARCHIVE_OK )
   { if ( PL_unify_wchars(name, PL_ATOM, -1,

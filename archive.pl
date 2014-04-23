@@ -174,10 +174,15 @@ defined_archive_property(filter(_)).
 %	      archive_next_header(Archive, Entry),
 %	      archive_open_entry(Archive, Stream).
 %	  ==
+%
+%	@error permission_error(next_header, archive, Handle) if a
+%	previously opened entry is not closed.
 
 %%	archive_open_entry(+Archive, -Stream) is det.
 %
-%	Open the current entry as a stream.  Stream must be closed.
+%	Open the current entry as a stream. Stream must be closed.
+%	If the stream is not closed before the next call to
+%	archive_next_header/2, a permission error is raised.
 
 %%	archive_header_property(+Archive, ?Property)
 %
