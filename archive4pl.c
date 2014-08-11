@@ -830,7 +830,7 @@ archive_header_prop(term_t archive, term_t field)
       case AE_IFDIR:  name = ATOM_directory;        break;
       case AE_IFIFO:  name = ATOM_fifo;             break;
       default:
-	assert(0);
+	return PL_unify_integer(arg, (type&AE_IFMT));
     }
     return PL_unify_atom(arg, name);
   } else if ( prop == FUNCTOR_mtime1 )

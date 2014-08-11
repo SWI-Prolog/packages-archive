@@ -191,7 +191,9 @@ defined_archive_property(filter(_)).
 %
 %	  * filetype(-Type)
 %	  Type is one of =file=, =link=, =socket=, =character_device=,
-%	  =block_device=, =directory= or =fifo=.
+%	  =block_device=, =directory= or =fifo=.  It appears that this
+%	  library can also return other values.  These are returned as
+%	  an integer.
 %	  * mtime(-Time)
 %	  True when entry was last modified at time.
 %	  * size(-Bytes)
