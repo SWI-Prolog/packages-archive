@@ -50,11 +50,11 @@
 #define HAVE_ARCHIVE_READ_SUPPORT_FORMAT_RAW 1
 #define HAVE_ARCHIVE_READ_SUPPORT_FORMAT_TAR 1
 #define HAVE_ARCHIVE_READ_SUPPORT_FORMAT_ZIP 1
-#define HAVE_ARCHIVE_READ_CLOSE 1
+#define HAVE_ARCHIVE_READ_FREE 1
 #endif
 
-#ifndef HAVE_ARCHIVE_READ_CLOSE
-#define archive_read_close(ar) archive_read_finish(ar)
+#ifndef HAVE_ARCHIVE_READ_FREE
+#define archive_read_free(ar) archive_read_finish(ar)
 #endif
 
 #if ARCHIVE_VERSION_NUMBER < 3000000
@@ -190,7 +190,7 @@ release_archive(atom_t symbol)
 
   if ( (a=ar->archive) )
   { ar->archive = NULL;
-    archive_read_close(a);
+    archive_read_free(a);
   }
 
   free_archive(ar);
@@ -787,7 +787,7 @@ archive_close(term_t archive)
   { ar->closed_archive = TRUE;
 
     return TRUE;
-  } else if ( (rc=archive_read_close(ar->archive)) == ARCHIVE_OK )
+  } else if ( (rc=archive_read_free(ar->archive)) == ARCHIVE_OK )
   { ar->entry = NULL;
     ar->archive = NULL;
     ar->symbol = 0;
@@ -908,7 +908,7 @@ ar_close_entry(void *handle)
     ar->archive = NULL;
     ar->symbol = 0;
 
-    archive_read_close(a);
+    archive_read_free(a);
   }
   if ( ar->status == AR_OPENED_ENTRY )
   { PL_unregister_atom(ar->symbol);
