@@ -284,11 +284,8 @@ static ssize_t
 ar_read(struct archive *a, void *cdata, const void **buffer)
 { archive_wrapper *ar = cdata;
 
-  Sfprintf(Soutput,"*** archive: ar_read\n");
   if ( Sfeof(ar->data) )
-  { 
-	 Sfprintf(Soutput,"*** archive: at end of stream, returning 0\n");
-	 return 0;
+  { return 0;
   } else
   { ssize_t bytes = ar->data->limitp - ar->data->bufp;
 
@@ -296,7 +293,6 @@ ar_read(struct archive *a, void *cdata, const void **buffer)
     ar->data->bufp = ar->data->limitp;
     ar->data->position->byteno += bytes;
 
-	 Sfprintf(Soutput,"*** archive: ar_read returning %d bytes\n",bytes);
     return bytes;
   }
 }
@@ -309,7 +305,6 @@ static __LA_INT64_T
 ar_skip(struct archive *a, void *cdata, __LA_INT64_T request)
 { archive_wrapper *ar = cdata;
 
-  Sfprintf(Soutput,"*** archive: ar_skip %ld\n", request);
   if ( Sseek64(ar->data, request, SIO_SEEK_CUR) == 0 )
     return request;
   Sclearerr(ar->data);
@@ -320,7 +315,6 @@ ar_skip(struct archive *a, void *cdata, __LA_INT64_T request)
 static __LA_INT64_T
 ar_seek(struct archive *a, void *cdata, __LA_INT64_T request, int whence)
 { archive_wrapper *ar = cdata;
-  Sfprintf(Soutput,"*** archive: ar_seek (%d) %ld\n", whence, request);
   int s_whence;
   switch (whence) {
     case SEEK_SET: s_whence=SIO_SEEK_SET; break;
@@ -330,12 +324,10 @@ ar_seek(struct archive *a, void *cdata, __LA_INT64_T request, int whence)
 
   if ( Sseek64(ar->data, request, s_whence) == 0 ) {
 	  __LA_INT64_T pos = Stell64(ar->data);
-	  Sfprintf(Soutput,"*** archive: ar_seek returning %ld\n", pos);
     return pos; //Stell64(ar->data);
   }
   Sclearerr(ar->data);
 
-  Sfprintf(Soutput,"*** archive: ar_seek FAILED\n");
   return ARCHIVE_FATAL;
 }
 
