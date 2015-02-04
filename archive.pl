@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@cs.vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (C): 2012-2014, VU University Amsterdam
+    Copyright (C): 2012-2015, VU University Amsterdam
 
     This program is free software; you can redistribute it and/or
     modify it under the terms of the GNU General Public License
@@ -35,7 +35,9 @@
 	    archive_open_entry/2,	% +Archive, -EntryStream
 	    archive_header_property/2,	% +Archive, ?Property
 	    archive_extract/3,		% +Archive, +Dir, +Options
-	    archive_entries/2		% +Archive, -Entries
+
+	    archive_entries/2,		% +Archive, -Entries
+	    archive_data_stream/3	% +Archive, -DataStream, +Options
 	  ]).
 :- use_module(library(error)).
 
@@ -270,6 +272,10 @@ extract(Archive, Dir, Options) :-
 extract(_, _, _).
 
 
+		 /*******************************
+		 *    HIGH LEVEL PREDICATES	*
+		 *******************************/
+
 %%	archive_entries(+Archive, -Paths) is det.
 %
 %	True when Paths is a list of pathnames appearing in Archive.
@@ -284,3 +290,80 @@ contents(Handle, [Path|T]) :-
 	archive_next_header(Handle, Path), !,
 	contents(Handle, T).
 contents(_, []).
+
+%%	archive_data_stream(+Archive, -DataStream, +Options) is nondet.
+%
+%	True when DataStream  is  a  stream   to  a  data  object inside
+%	Archive.  This  predicate  transparently   unpacks  data  inside
+%	_possibly nested_ archives, e.g., a _tar_   file  inside a _zip_
+%	file. It applies the appropriate  decompression filters and thus
+%	ensures that Prolog  reads  the   plain  data  from  DataStream.
+%	DataStream must be closed after the  content has been processed.
+%	Backtracking opens the next member of the (nested) archive. This
+%	predicate processes the following options:
+%
+%	  - meta_data(-Data:list(dict))
+%	  If provided, Data is unified with a list of filters applied to
+%	  the (nested) archive to open the current DataStream. The first
+%	  element describes the outermost archive. Each Data dict
+%	  contains the header properties (archive_header_property/2) as
+%	  well as the keys:
+%
+%	    - filters(Filters:list(atom))
+%	    Filter list as obtained from archive_property/2
+%	    - name(Atom)
+%	    Name of the entry.
+%
+%	Note that this predicate can  handle   a  non-archive files as a
+%	pseudo archive holding a single   stream by using archive_open/3
+%	with the options `[format(all), format(raw)]`.
+
+archive_data_stream(Archive, DataStream, Options) :-
+	option(meta_data(MetaData), Options, _),
+	archive_content(Archive, DataStream, MetaData, []).
+
+archive_content(Archive, Entry, [EntryMetadata|PipeMetadataTail], PipeMetadata2) :-
+	archive_property(Archive, filter(Filters)),
+	repeat,
+	(   archive_next_header(Archive, EntryName)
+	->  findall(EntryProperty,
+		    archive_header_property(Archive, EntryProperty),
+		    EntryProperties),
+	    dict_create(EntryMetadata, archive_meta_data,
+			[ filters(Filters),
+			  name(EntryName)
+			| EntryProperties
+			]),
+	    (   EntryMetadata.filetype == file
+	    ->  archive_open_entry(Archive, Entry0),
+		(   EntryName == data,
+		    EntryMetadata.format == raw
+		->  % This is the last entry in this nested branch.
+		    % We therefore close the choicepoint created by repeat/0.
+	            % Not closing this choicepoint would cause
+	            % archive_next_header/2 to throw an exception.
+		    !,
+		    PipeMetadataTail = PipeMetadata2,
+		    Entry = Entry0
+		;   PipeMetadataTail = PipeMetadata1,
+		    open_substream(Entry0,
+				   Entry,
+				   PipeMetadata1,
+				   PipeMetadata2)
+		)
+	    ;   fail
+	    )
+	;   !,
+	    fail
+	).
+
+open_substream(In, Entry, ArchiveMetadata, PipeTailMetadata) :-
+	setup_call_cleanup(
+	    archive_open(stream(In),
+			 Archive,
+			 [ close_parent(true),
+			   format(all),
+			   format(raw)
+			 ]),
+	    archive_content(Archive, Entry, ArchiveMetadata, PipeTailMetadata),
+	    archive_close(Archive)).
