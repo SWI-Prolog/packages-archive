@@ -63,6 +63,14 @@ The following example lists the entries in an archive:
 
 :- use_foreign_library(foreign(archive4pl)).
 
+:- predicate_options(archive_open/3, 3,
+		     [ close_parent(boolean),
+		       filter(oneof([all,bzip2,compress,gzip,grzip,lrzip,
+				     lzip,lzma,lzop,none,rpm,uu,xz])),
+		       format(oneof([all,'7zip',ar,cab,cpio,empty,gnutar,
+				     iso9660,lha,mtree,rar,raw,tar,xar,zip]))
+		     ]).
+
 %%	archive_open(+Data, -Archive, +Options) is det.
 %
 %	Open the archive in Data and unify  Archive with a handle to the
