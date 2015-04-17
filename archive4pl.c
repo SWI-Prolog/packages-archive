@@ -312,6 +312,7 @@ ar_skip(struct archive *a, void *cdata, __LA_INT64_T request)
   return 0;				/* cannot skip; library will read */
 }
 
+#ifdef HAVE_ARCHIVE_READ_OPEN1
 static __LA_INT64_T
 ar_seek(struct archive *a, void *cdata, __LA_INT64_T request, int whence)
 { archive_wrapper *ar = cdata;
@@ -331,7 +332,7 @@ ar_seek(struct archive *a, void *cdata, __LA_INT64_T request, int whence)
 
   return ARCHIVE_FATAL;
 }
-
+#endif
 
 
 		 /*******************************
@@ -721,6 +722,7 @@ archive_open_stream(term_t data, term_t handle, term_t options)
 #endif
   }
 
+#ifdef HAVE_ARCHIVE_READ_OPEN1
   archive_read_set_callback_data(ar->archive, ar);
   archive_read_set_open_callback(ar->archive, ar_open);
   archive_read_set_read_callback(ar->archive, ar_read);
@@ -732,6 +734,13 @@ archive_open_stream(term_t data, term_t handle, term_t options)
   { ar->status = AR_OPENED;
     return TRUE;
   }
+#else
+  if ( archive_read_open2(ar->archive, ar,
+			  ar_open, ar_read, ar_skip, ar_close) == ARCHIVE_OK )
+  { ar->status = AR_OPENED;
+    return TRUE;
+  }
+#endif
 
   return archive_error(ar);
 }
