@@ -268,7 +268,7 @@ ar_close(struct archive *a, void *cdata)
 { archive_wrapper *ar = cdata;
 
   PL_release_stream(ar->data);
-  if ( ar->close_parent )
+  if ( ar->close_parent && ar->archive )
   { if ( Sclose(ar->data) != 0 )
     { archive_set_error(ar->archive, errno, "Close failed");
       ar->data = NULL;
