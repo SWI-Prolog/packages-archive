@@ -935,14 +935,16 @@ ar_close_entry(void *handle)
 { archive_wrapper *ar = handle;
 
   if ( ar->closed_archive )
-  { struct archive *a = ar->archive;
+  { if ( ar->archive )
+    { int rc;
 
-    ar->archive = NULL;
-    ar->entry = NULL;
-    ar->archive = NULL;
-    ar->symbol = 0;
-
-    archive_read_free(a);
+      if ( (rc=archive_read_free(ar->archive)) == ARCHIVE_OK )
+      { ar->entry = NULL;
+	ar->archive = NULL;
+	ar->symbol = 0;
+      } else
+	return -1;
+    }
   }
   if ( ar->status == AR_OPENED_ENTRY )
   { PL_unregister_atom(ar->symbol);
