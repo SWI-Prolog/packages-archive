@@ -28,7 +28,8 @@
 */
 
 :- module(archive,
-	  [ archive_open/3,		% +Stream, -Archive, +Options
+	  [ archive_create/3,       % +OutputFile, +InputFileList, +Options
+	    archive_open/3,			% +Stream, -Archive, +Options
 	    archive_close/1,		% +Archive
 	    archive_property/2,		% +Archive, ?Property
 	    archive_next_header/2,	% +Archive, -Name
@@ -70,6 +71,100 @@ The following example lists the entries in an archive:
 		       format(oneof([all,'7zip',ar,cab,cpio,empty,gnutar,
 				     iso9660,lha,mtree,rar,raw,tar,xar,zip]))
 		     ]).
+
+:- predicate_options(archive_create/3, 3,
+			 [ recursive(boolean),
+			   directory(atom),
+			   filter(oneof([b64encode,bzip2,compress,gzip,grzip,lrzip,
+					 lzip,lzma,lzop,none,uuencode,xz])),
+			   format(oneof(['7zip',ar_bsd,ar_svr4,cpio,cpio_newc,gnutar,
+					 iso9660,mtree,mtree_classic,pax,pax_restricted,raw,
+					 shar,shar_dump,ustar,v7tar,warc,xar,zip]))
+			 ]).
+
+%%	archive_create(+OutputFile, +InputFileList, +Options) is det.
+%
+%	Create archive specified by  =OutputFile=  from a  list of files
+%	and directories specified by =InputFileList=.
+%
+%	  * recursive(+Boolean)
+%	  If this option is   =true= (default =false=), directories  will
+%	  be  expanded   recursively.  A  typical  usecase is to  create
+%	  an archive out of specified top leve directory.
+%
+%	  * directory(+Directory)
+%	  Changes the directory before adding input files. If this is
+%	  specified,   paths of  input  files   must be relative to
+%	  = Directory =.
+%
+%	  * compression(+Compression)
+%	  Synomym for filter(Compression).  Deprecated.
+%
+%	  * filter(+Filter)
+%	  Support the indicated filter. This option can only be used
+%	  once. If no filter options are provided, =gzip= is assumed.
+%	  Supported values are =b64encode=, =bzip2=, =compress=, =gzip=,
+%	  =grzip=, =lrzip=, =lzip=, =lzma=, =lzop=, =none=, =uuencode=,
+%	  and =xz=. The value =gzip= is default.
+%
+%	  * format(+Format)
+%	  Support the indicated format.  This option can only be used
+%	  once. If no format options are provided, =all= is assumed.
+%	  Supported values are: =7zip=, =ar_bsd=, =ar_svr4=, =cpio=,
+%	  =cpio_newc=, =gnutar=, =iso9660=, =mtree=, =mtree_classic=,
+%	  =pax=, =pax_restricted=, =shar=, =shar_dump=, =ustar=,
+%	  =v7tar=, =warc=, =xar=, and =zip=.
+%	  The value =pax_restricted= is default.
+%
+%	Note that the actually supported   compression types and formats
+%	may vary depending on the version   and  installation options of
+%	the underlying libarchive  library.  This   predicate  raises  a
+%	domain  error  if  the  (explicitly)  requested  format  is  not
+%	supported.
+%
+%	@error	domain_error(filter, Filter) if the requested
+%		filter is not supported.
+%	@error	domain_error(format, Format) if the requested
+%		format type is not supported.
+archive_create(OutputFile, InputFileList, Options) :-
+	option(recursive(Recursive), Options, false),
+	option(directory(Dir), Options, _),
+	rebuild_input_file_list(InputFileList, ExpandedInputFileList,
+							Recursive, Dir),
+	archive_create0(OutputFile, ExpandedInputFileList, Options).
+
+rebuild_input_file_list(InputFileList, ExpandedInputFileList, false, Dir) :- !,
+	(	var(Dir)
+	->	ExpandedInputFileList = InputFileList
+	;	fix_paths(Dir, InputFileList, ExpandedInputFileList)
+	).
+rebuild_input_file_list([], [], _, _) :- !.
+rebuild_input_file_list([H|T], ExpandedInputFileList, true, Dir) :-
+	rebuild_input_file_list(T, ExpandedInputFileList0, true, Dir),
+	(	var(Dir)
+	->	RealPath = H
+	;	directory_file_path(Dir, H, RealPath)
+	),
+	(	exists_directory(RealPath)
+	->	directory_files(RealPath, Entries0),
+		exclude(special_file, Entries0, Entries1),
+		fix_paths(H, Entries1, Entries),
+		InputFileList = [H|Entries],
+		append(ExpandedInputFileList0, InputFileList, ExpandedInputFileList)
+	;	(	exists_file(RealPath)
+		->	ExpandedInputFileList = [H|ExpandedInputFileList0]
+		;	ExpandedInputFileList = ExpandedInputFileList0
+		)
+	).
+
+special_file('.').
+special_file('..').
+
+fix_paths(_, [], []) :- !.
+fix_paths(Dir, [H|T], Entries) :-
+	fix_paths(Dir, T, Entries0),
+	directory_file_path(Dir, H, Entry),
+	Entries = [Entry|Entries0].
 
 %%	archive_open(+Data, -Archive, +Options) is det.
 %
