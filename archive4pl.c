@@ -32,32 +32,88 @@
 #include <string.h>
 #include <errno.h>
 #include <ctype.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <stdio.h>
 
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #else					/* assume complete recent libarchive */
-#define HAVE_ARCHIVE_READ_SUPPORT_COMPRESSION_BZIP2 1
-#define HAVE_ARCHIVE_READ_SUPPORT_COMPRESSION_COMPRESS 1
-#define HAVE_ARCHIVE_READ_SUPPORT_COMPRESSION_GZIP 1
-#define HAVE_ARCHIVE_READ_SUPPORT_COMPRESSION_LZMA 1
-#define HAVE_ARCHIVE_READ_SUPPORT_COMPRESSION_NONE 1
-#define HAVE_ARCHIVE_READ_SUPPORT_COMPRESSION_XZ 1
+#define HAVE_ARCHIVE_READ_SUPPORT_FILTER_BZIP2 1
+#define HAVE_ARCHIVE_READ_SUPPORT_FILTER_COMPRESS 1
+#define HAVE_ARCHIVE_READ_SUPPORT_FILTER_GZIP 1
+#define HAVE_ARCHIVE_READ_SUPPORT_FILTER_GRZIP 1
+#define HAVE_ARCHIVE_READ_SUPPORT_FILTER_LRZIP 1
+#define HAVE_ARCHIVE_READ_SUPPORT_FILTER_LZIP 1
+#define HAVE_ARCHIVE_READ_SUPPORT_FILTER_LZMA 1
+#define HAVE_ARCHIVE_READ_SUPPORT_FILTER_LZOP 1
+#define HAVE_ARCHIVE_READ_SUPPORT_FILTER_NONE 1
+#define HAVE_ARCHIVE_READ_SUPPORT_FILTER_RPM 1
+#define HAVE_ARCHIVE_READ_SUPPORT_FILTER_UU 1
+#define HAVE_ARCHIVE_READ_SUPPORT_FILTER_XZ 1
+#define HAVE_ARCHIVE_READ_SUPPORT_FORMAT_7ZIP 1
 #define HAVE_ARCHIVE_READ_SUPPORT_FORMAT_AR 1
+#define HAVE_ARCHIVE_READ_SUPPORT_FORMAT_CAB 1
 #define HAVE_ARCHIVE_READ_SUPPORT_FORMAT_CPIO 1
 #define HAVE_ARCHIVE_READ_SUPPORT_FORMAT_EMPTY 1
+#define HAVE_ARCHIVE_READ_SUPPORT_FORMAT_GNUTAR 1
 #define HAVE_ARCHIVE_READ_SUPPORT_FORMAT_ISO9660 1
+#define HAVE_ARCHIVE_READ_SUPPORT_FORMAT_LHA 1
 #define HAVE_ARCHIVE_READ_SUPPORT_FORMAT_MTREE 1
+#define HAVE_ARCHIVE_READ_SUPPORT_FORMAT_RAR 1
 #define HAVE_ARCHIVE_READ_SUPPORT_FORMAT_RAW 1
 #define HAVE_ARCHIVE_READ_SUPPORT_FORMAT_TAR 1
+#define HAVE_ARCHIVE_READ_SUPPORT_FORMAT_XAR 1
 #define HAVE_ARCHIVE_READ_SUPPORT_FORMAT_ZIP 1
 #define HAVE_ARCHIVE_READ_FREE 1
+
+#define HAVE_ARCHIVE_WRITE_ADD_FILTER_B64ENCODE 1
+#define HAVE_ARCHIVE_WRITE_ADD_FILTER_BZIP2 1
+#define HAVE_ARCHIVE_WRITE_ADD_FILTER_COMPRESS 1
+#define HAVE_ARCHIVE_WRITE_ADD_FILTER_GRZIP 1
+#define HAVE_ARCHIVE_WRITE_ADD_FILTER_GZIP 1
+#define HAVE_ARCHIVE_WRITE_ADD_FILTER_LRZIP 1
+#define HAVE_ARCHIVE_WRITE_ADD_FILTER_LZIP 1
+#define HAVE_ARCHIVE_WRITE_ADD_FILTER_LZMA 1
+#define HAVE_ARCHIVE_WRITE_ADD_FILTER_LZOP 1
+#define HAVE_ARCHIVE_WRITE_ADD_FILTER_NONE 1
+#define HAVE_ARCHIVE_WRITE_ADD_FILTER_UUENCODE 1
+#define HAVE_ARCHIVE_WRITE_ADD_FILTER_XZ 1
+#define HAVE_ARCHIVE_WRITE_SET_FORMAT_7ZIP 1
+#define HAVE_ARCHIVE_WRITE_SET_FORMAT_AR_BSD 1
+#define HAVE_ARCHIVE_WRITE_SET_FORMAT_AR_SVR4 1
+#define HAVE_ARCHIVE_WRITE_SET_FORMAT_CPIO 1
+#define HAVE_ARCHIVE_WRITE_SET_FORMAT_CPIO_NEWC 1
+#define HAVE_ARCHIVE_WRITE_SET_FORMAT_GNUTAR 1
+#define HAVE_ARCHIVE_WRITE_SET_FORMAT_ISO9660 1
+#define HAVE_ARCHIVE_WRITE_SET_FORMAT_MTREE 1
+#define HAVE_ARCHIVE_WRITE_SET_FORMAT_MTREE_CLASSIC 1
+#define HAVE_ARCHIVE_WRITE_SET_FORMAT_PAX 1
+#define HAVE_ARCHIVE_WRITE_SET_FORMAT_PAX_RESTRICTED 1
+#define HAVE_ARCHIVE_WRITE_SET_FORMAT_RAW 1
+#define HAVE_ARCHIVE_WRITE_SET_FORMAT_SHAR 1
+#define HAVE_ARCHIVE_WRITE_SET_FORMAT_SHAR_DUMP 1
+#define HAVE_ARCHIVE_WRITE_SET_FORMAT_USTAR 1
+#define HAVE_ARCHIVE_WRITE_SET_FORMAT_V7TAR 1
+#define HAVE_ARCHIVE_WRITE_SET_FORMAT_WARC 1
+#define HAVE_ARCHIVE_WRITE_SET_FORMAT_XAR 1
+#define HAVE_ARCHIVE_WRITE_SET_FORMAT_ZIP 1
+#define HAVE_ARCHIVE_WRITE_FREE 1
 #endif
 
 #ifndef HAVE_ARCHIVE_READ_FREE
 #define archive_read_free(ar) archive_read_finish(ar)
 #endif
 
-#if ARCHIVE_VERSION_NUMBER < 3000000
+#ifndef HAVE_ARCHIVE_WRITE_OPEN_FILENAME
+#define archive_write_open_filename(ar, filename) archive_write_open_file(ar, filename)
+#endif
+
+#ifndef HAVE_ARCHIVE_WRITE_FREE
+#define archive_write_free(ar) archive_write_finish(ar)
+#endif
+
+#if ARCHIVE_VERSION_NUMBER < 4000000
 #define archive_read_support_filter_all archive_read_support_compression_all
 
 #ifdef HAVE_ARCHIVE_READ_SUPPORT_COMPRESSION_BZIP2
@@ -83,6 +139,35 @@
 #ifdef HAVE_ARCHIVE_READ_SUPPORT_COMPRESSION_XZ
 #define HAVE_ARCHIVE_READ_SUPPORT_FILTER_XZ
 #define archive_read_support_filter_xz archive_read_support_compression_xz
+#endif
+
+#ifdef HAVE_ARCHIVE_WRITE_SET_COMPRESSION_BZIP2
+#define HAVE_ARCHIVE_WRITE_ADD_FILTER_BZIP2 1
+#define archive_write_add_filter_bzip2 archive_write_set_compression_bzip2
+#endif
+#ifdef HAVE_ARCHIVE_WRITE_SET_COMPRESSION_COMPRESS
+#define HAVE_ARCHIVE_WRITE_ADD_FILTER_COMPRESS 1
+#define archive_write_add_filter_compress archive_write_set_compression_compress
+#endif
+#ifdef HAVE_ARCHIVE_WRITE_SET_COMPRESSION_GZIP
+#define HAVE_ARCHIVE_WRITE_ADD_FILTER_GZIP 1
+#define archive_write_add_filter_gzip archive_write_set_compression_gzip
+#endif
+#ifdef HAVE_ARCHIVE_WRITE_SET_COMPRESSION_LZIP
+#define HAVE_ARCHIVE_WRITE_ADD_FILTER_LZIP 1
+#define archive_write_add_filter_lzip archive_write_set_compression_lzip
+#endif
+#ifdef HAVE_ARCHIVE_WRITE_SET_COMPRESSION_LZMA
+#define HAVE_ARCHIVE_WRITE_ADD_FILTER_LZMA 1
+#define archive_write_add_filter_lzma archive_write_set_compression_lzma
+#endif
+#ifdef HAVE_ARCHIVE_WRITE_SET_COMPRESSION_NONE
+#define HAVE_ARCHIVE_WRITE_ADD_FILTER_NONE 1
+#define archive_write_add_filter_none archive_write_set_compression_none
+#endif
+#ifdef HAVE_ARCHIVE_WRITE_SET_COMPRESSION_XZ
+#define HAVE_ARCHIVE_WRITE_ADD_FILTER_XZ 1
+#define archive_write_add_filter_xz archive_write_set_compression_xz
 #endif
 #endif /*ARCHIVE_VERSION_NUMBER < 3000000*/
 
@@ -146,7 +231,7 @@ static atom_t ATOM_cab;
 static atom_t ATOM_cpio;
 static atom_t ATOM_empty;
 static atom_t ATOM_gnutar;
-static atom_t ATOM_iso9960;
+static atom_t ATOM_iso9660;
 static atom_t ATOM_lha;
 static atom_t ATOM_mtree;
 static atom_t ATOM_rar;
@@ -161,6 +246,19 @@ static atom_t ATOM_character_device;
 static atom_t ATOM_block_device;
 static atom_t ATOM_directory;
 static atom_t ATOM_fifo;
+static atom_t ATOM_b64encode;
+static atom_t ATOM_uuencode;
+static atom_t ATOM_ar_bsd;
+static atom_t ATOM_ar_svr4;
+static atom_t ATOM_cpio_newc;
+static atom_t ATOM_mtree_classic;
+static atom_t ATOM_pax;
+static atom_t ATOM_pax_restricted;
+static atom_t ATOM_shar;
+static atom_t ATOM_shar_dump;
+static atom_t ATOM_ustar;
+static atom_t ATOM_v7tar;
+static atom_t ATOM_warc;
 
 static functor_t FUNCTOR_error2;
 static functor_t FUNCTOR_archive_error2;
@@ -424,7 +522,7 @@ archive_error(archive_wrapper *ar)
 #define FORMAT_GNUTAR	  0x00200000
 #endif
 #ifdef HAVE_ARCHIVE_READ_SUPPORT_FORMAT_ISO9660
-#define FORMAT_ISO9960	  0x00400000
+#define FORMAT_ISO9660	  0x00400000
 #endif
 #ifdef HAVE_ARCHIVE_READ_SUPPORT_FORMAT_LHA
 #define FORMAT_LHA	  0x00800000
@@ -458,6 +556,269 @@ enable_type(archive_wrapper *ar, int type,
   { if ( (*f)(ar->archive) != ARCHIVE_OK )
       ar->type &= ~type;
   }
+}
+
+static foreign_t
+archive_create0(term_t output_file, term_t input_files, term_t options)
+{ char *output_file_s;
+  if ( !PL_get_atom_chars(output_file, &output_file_s) )
+    return FALSE;
+
+  struct archive *archive;
+
+  if ( !(archive = archive_write_new()) )
+    return PL_resource_error("memory");
+
+  term_t options_tail = PL_copy_term_ref(options);
+  term_t options_head = PL_new_term_ref();
+  term_t arg  = PL_new_term_ref();
+
+  int has_filter = FALSE;
+  int has_format = FALSE;
+  char *dir = NULL;
+  while( PL_get_list_ex(options_tail, options_head, options_tail) )
+  { atom_t name;
+    int arity;
+
+    if ( !PL_get_name_arity(options_head, &name, &arity) ||
+         !PL_get_arg(1, options_head, arg) )
+    { PL_type_error("option", options_head);
+      goto error;
+    }
+
+    if ( name == ATOM_compression || name == ATOM_filter)
+    { has_filter = TRUE;
+      atom_t c;
+
+      if ( !PL_get_atom_ex(arg, &c) )
+        goto error;
+
+      if ( FALSE ) {}
+#ifdef HAVE_ARCHIVE_WRITE_ADD_FILTER_BZIP2
+      else if ( c == ATOM_bzip2 )
+        archive_write_add_filter_bzip2(archive);
+#endif
+#ifdef HAVE_ARCHIVE_WRITE_ADD_FILTER_COMPRESS
+      else if ( c == ATOM_compress )
+        archive_write_add_filter_compress(archive);
+#endif
+#ifdef HAVE_ARCHIVE_WRITE_ADD_FILTER_GRZIP
+      else if ( c == ATOM_grzip )
+        archive_write_add_filter_grzip(archive);
+#endif
+#ifdef HAVE_ARCHIVE_WRITE_ADD_FILTER_GZIP
+      else if ( c == ATOM_gzip )
+        archive_write_add_filter_gzip(archive);
+#endif
+#ifdef HAVE_ARCHIVE_WRITE_ADD_FILTER_LRZIP
+      else if ( c == ATOM_lrzip )
+        archive_write_add_filter_lrzip(archive);
+#endif
+#ifdef HAVE_ARCHIVE_WRITE_ADD_FILTER_LZIP
+      else if ( c == ATOM_lzip )
+        archive_write_add_filter_lzip(archive);
+#endif
+#ifdef HAVE_ARCHIVE_WRITE_ADD_FILTER_LZMA
+      else if ( c == ATOM_lzma )
+        archive_write_add_filter_lzma(archive);
+#endif
+#ifdef HAVE_ARCHIVE_WRITE_ADD_FILTER_LZOP
+      else if ( c == ATOM_lzop )
+        archive_write_add_filter_lzop(archive);
+#endif
+#ifdef HAVE_ARCHIVE_WRITE_ADD_FILTER_NONE
+      else if ( c == ATOM_none )
+        archive_write_add_filter_none(archive);
+#endif
+#ifdef HAVE_ARCHIVE_WRITE_ADD_FILTER_UUENCODE
+      else if ( c == ATOM_uuencode )
+        archive_write_add_filter_uuencode(archive);
+#endif
+#ifdef HAVE_ARCHIVE_WRITE_ADD_FILTER_XZ
+      else if ( c == ATOM_xz )
+        archive_write_add_filter_xz(archive);
+#endif
+      else
+      { PL_domain_error("filter", arg);
+        goto error;
+      }
+    } else if ( name == ATOM_format )
+    { has_format = TRUE;
+      atom_t f;
+
+      if ( !PL_get_atom_ex(arg, &f) )
+        goto error;
+
+      if ( 0 ) {}
+#ifdef HAVE_ARCHIVE_WRITE_SET_FORMAT_7ZIP
+      else if ( f == ATOM_7zip )
+        archive_write_set_format_7zip(archive);
+#endif
+#ifdef HAVE_ARCHIVE_WRITE_SET_FORMAT_AR_BSD
+      else if ( f == ATOM_ar_bsd )
+        archive_write_set_format_ar_bsd(archive);
+#endif
+#ifdef HAVE_ARCHIVE_WRITE_SET_FORMAT_AR_SVR4
+      else if ( f == ATOM_ar_svr4 )
+        archive_write_set_format_ar_svr4(archive);
+#endif
+#ifdef HAVE_ARCHIVE_WRITE_SET_FORMAT_CPIO
+      else if ( f == ATOM_cpio )
+        archive_write_set_format_cpio(archive);
+#endif
+#ifdef HAVE_ARCHIVE_WRITE_SET_FORMAT_CPIO_NEWC
+      else if ( f == ATOM_cpio_newc )
+        archive_write_set_format_cpio_newc(archive);
+#endif
+#ifdef HAVE_ARCHIVE_WRITE_SET_FORMAT_GNUTAR
+      else if ( f == ATOM_gnutar )
+        archive_write_set_format_gnutar(archive);
+#endif
+#ifdef HAVE_ARCHIVE_WRITE_SET_FORMAT_ISO9660
+      else if ( f == ATOM_iso9660 )
+        archive_write_set_format_iso9660(archive);
+#endif
+#ifdef HAVE_ARCHIVE_WRITE_SET_FORMAT_MTREE
+      else if ( f == ATOM_mtree )
+        archive_write_set_format_mtree(archive);
+#endif
+#ifdef HAVE_ARCHIVE_WRITE_SET_FORMAT_MTREE_CLASSIC
+      else if ( f == ATOM_mtree_classic )
+        archive_write_set_format_mtree_classic(archive);
+#endif
+#ifdef HAVE_ARCHIVE_WRITE_SET_FORMAT_PAX
+      else if ( f == ATOM_pax )
+        archive_write_set_format_pax(archive);
+#endif
+#ifdef HAVE_ARCHIVE_WRITE_SET_FORMAT_PAX_RESTRICTED
+      else if ( f == ATOM_pax_restricted )
+        archive_write_set_format_pax_restricted(archive);
+#endif
+#ifdef HAVE_ARCHIVE_WRITE_SET_FORMAT_RAW
+      else if ( f == ATOM_raw )
+        archive_write_set_format_raw(archive);
+#endif
+#ifdef HAVE_ARCHIVE_WRITE_SET_FORMAT_SHAR
+      else if ( f == ATOM_shar )
+        archive_write_set_format_shar(archive);
+#endif
+#ifdef HAVE_ARCHIVE_WRITE_SET_FORMAT_SHAR_DUMP
+      else if ( f == ATOM_shar_dump )
+        archive_write_set_format_shar_dump(archive);
+#endif
+#ifdef HAVE_ARCHIVE_WRITE_SET_FORMAT_USTAR
+      else if ( f == ATOM_ustar )
+        archive_write_set_format_ustar(archive);
+#endif
+#ifdef HAVE_ARCHIVE_WRITE_SET_FORMAT_V7TAR
+      else if ( f == ATOM_v7tar )
+        archive_write_set_format_v7tar(archive);
+#endif
+#ifdef HAVE_ARCHIVE_WRITE_SET_FORMAT_WARC
+      else if ( f == ATOM_warc )
+        archive_write_set_format_warc(archive);
+#endif
+#ifdef HAVE_ARCHIVE_WRITE_SET_FORMAT_XAR
+      else if ( f == ATOM_xar )
+        archive_write_set_format_xar(archive);
+#endif
+#ifdef HAVE_ARCHIVE_WRITE_SET_FORMAT_ZIP
+      else if ( f == ATOM_zip )
+        archive_write_set_format_zip(archive);
+#endif
+      else
+      { PL_domain_error("format", arg);
+        goto error;
+      }
+    } else if ( name == ATOM_directory )
+    {  if ( !PL_get_atom_chars(arg, &dir) )
+        goto error;
+    }
+  }
+
+  if ( !PL_get_nil_ex(options_tail) )
+    goto error;
+
+  if ( !has_filter )
+    archive_write_add_filter_gzip(archive);
+  if ( !has_format )
+    archive_write_set_format_pax_restricted(archive);
+
+  archive_write_open_filename(archive, output_file_s);
+
+  term_t input_files_tail = PL_copy_term_ref(input_files);
+  term_t input_files_head = PL_new_term_ref();
+
+  struct stat st;
+  char buff[8192];
+  struct archive_entry *entry;
+
+  while( PL_get_list_ex(input_files_tail, input_files_head, input_files_tail) )
+  { char* input_file;
+    if ( !PL_get_atom_chars(input_files_head, &input_file) )
+    { PL_warning("input file name should be an atom\n");
+      continue;
+    }
+
+    if ( !(entry = archive_entry_new()) )
+    { PL_resource_error("memory");
+      goto error;
+    }
+
+    archive_entry_set_pathname(entry, input_file);
+
+    char *full_path = NULL;
+    if ( dir )
+    { if ( !(full_path = PL_malloc(strlen(dir) + strlen(input_file) + 2)) )
+      { PL_resource_error("memory");
+        goto error;
+      }
+      sprintf(full_path, "%s/%s", dir, input_file);
+    } else
+    { if ( !(full_path = PL_malloc(strlen(input_file) + 1)) )
+      { PL_resource_error("memory");
+        goto error;
+      }
+      strcpy(full_path, input_file);
+    }
+
+    if ( stat(full_path, &st) )
+    { PL_warning("failed to access input file %s\n", full_path);
+      PL_free(full_path);
+      continue;
+    }
+
+    archive_entry_set_size(entry, st.st_size);
+    if (S_ISDIR(st.st_mode))
+      archive_entry_set_filetype(entry, AE_IFDIR);
+    else
+      archive_entry_set_filetype(entry, AE_IFREG);
+
+    int perm = st.st_mode & (S_IRWXU | S_IRWXG | S_IRWXO);
+    archive_entry_set_perm(entry, perm);
+    archive_write_header(archive, entry);
+
+    int len;
+    FILE *fd;
+    fd = fopen(full_path, "r");
+    PL_free(full_path);
+    len = fread(buff, 1, sizeof(buff), fd);
+    while ( len > 0 ) {
+      archive_write_data(archive, buff, len);
+      len = fread(buff, 1, sizeof(buff), fd);
+    }
+    close(fd);
+    archive_entry_free(entry);
+  }
+
+  archive_write_close(archive);
+  archive_write_free(archive);
+  return TRUE;
+
+error:
+  archive_write_close(archive);
+  archive_write_free(archive);
+  return FALSE;
 }
 
 static foreign_t
@@ -579,9 +940,9 @@ archive_open_stream(term_t data, term_t handle, term_t options)
       else if ( f == ATOM_gnutar )
 	ar->type |= FORMAT_GNUTAR;
 #endif
-#ifdef FORMAT_ISO9960
-      else if ( f == ATOM_iso9960 )
-	ar->type |= FORMAT_ISO9960;
+#ifdef FORMAT_ISO9660
+      else if ( f == ATOM_iso9660 )
+	ar->type |= FORMAT_ISO9660;
 #endif
 #ifdef FORMAT_LHA
       else if ( f == ATOM_lha )
@@ -696,8 +1057,8 @@ archive_open_stream(term_t data, term_t handle, term_t options)
 #ifdef FORMAT_GNUTAR
     enable_type(ar, FORMAT_GNUTAR,  archive_read_support_format_gnutar);
 #endif
-#ifdef FORMAT_ISO9960
-    enable_type(ar, FORMAT_ISO9960, archive_read_support_format_iso9660);
+#ifdef FORMAT_ISO9660
+    enable_type(ar, FORMAT_ISO9660, archive_read_support_format_iso9660);
 #endif
 #ifdef FORMAT_LHA
     enable_type(ar, FORMAT_LHA,     archive_read_support_format_lha);
@@ -1036,7 +1397,7 @@ install_archive4pl(void)
   MKATOM(cpio);
   MKATOM(empty);
   MKATOM(gnutar);
-  MKATOM(iso9960);
+  MKATOM(iso9660);
   MKATOM(lha);
   MKATOM(mtree);
   MKATOM(rar);
@@ -1051,6 +1412,19 @@ install_archive4pl(void)
   MKATOM(block_device);
   MKATOM(directory);
   MKATOM(fifo);
+  MKATOM(b64encode);
+  MKATOM(uuencode);
+  MKATOM(ar_bsd);
+  MKATOM(ar_svr4);
+  MKATOM(cpio_newc);
+  MKATOM(mtree_classic);
+  MKATOM(pax);
+  MKATOM(pax_restricted);
+  MKATOM(shar);
+  MKATOM(shar_dump);
+  MKATOM(ustar);
+  MKATOM(v7tar);
+  MKATOM(warc);
 
   MKFUNCTOR(error,         2);
   MKFUNCTOR(archive_error, 2);
@@ -1060,6 +1434,7 @@ install_archive4pl(void)
   MKFUNCTOR(link_target,   1);
   MKFUNCTOR(format,        1);
 
+  PL_register_foreign("archive_create0",      3, archive_create0,     0);
   PL_register_foreign("archive_open_stream",  3, archive_open_stream, 0);
   PL_register_foreign("archive_property",     3, archive_property,    0);
   PL_register_foreign("archive_close",        1, archive_close,       0);
