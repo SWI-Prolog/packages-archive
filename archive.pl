@@ -29,17 +29,21 @@
 
 :- module(archive,
 	  [ archive_open/3,		% +Stream, -Archive, +Options
+            archive_open/4,             % +Stream, +Mode, -Archive, +Options
+            archive_create/3,           % +OutputFile, +InputFileList, +Options
 	    archive_close/1,		% +Archive
 	    archive_property/2,		% +Archive, ?Property
 	    archive_next_header/2,	% +Archive, -Name
 	    archive_open_entry/2,	% +Archive, -EntryStream
 	    archive_header_property/2,	% +Archive, ?Property
+            archive_set_header_property/2,	% +Archive, +Property
 	    archive_extract/3,		% +Archive, +Dir, +Options
 
 	    archive_entries/2,		% +Archive, -Entries
 	    archive_data_stream/3	% +Archive, -DataStream, +Options
 	  ]).
 :- use_module(library(error)).
+:- use_module(library(filesex)).
 
 /** <module> Access several archive formats
 
@@ -63,7 +67,10 @@ The following example lists the entries in an archive:
 
 :- use_foreign_library(foreign(archive4pl)).
 
-:- predicate_options(archive_open/3, 3,
+archive_open(Stream, Archive, Options) :-
+        archive_open(Stream, read, Archive, Options).
+
+:- predicate_options(archive_open/4, 4,
 		     [ close_parent(boolean),
 		       filter(oneof([all,bzip2,compress,gzip,grzip,lrzip,
 				     lzip,lzma,lzop,none,rpm,uu,xz])),
@@ -71,7 +78,7 @@ The following example lists the entries in an archive:
 				     iso9660,lha,mtree,rar,raw,tar,xar,zip]))
 		     ]).
 
-%%	archive_open(+Data, -Archive, +Options) is det.
+%%	archive_open(+Data, +Mode, -Archive, +Options) is det.
 %
 %	Open the archive in Data and unify  Archive with a handle to the
 %	opened archive. Data is either a file  or a stream that contains
@@ -92,22 +99,24 @@ The following example lists the entries in an archive:
 %
 %	  * filter(+Filter)
 %	  Support the indicated filter. This option may be
-%	  used multiple times to support multiple filters. If
-%	  no filter options are provided, =all= is assumed.
+%	  used multiple times to support multiple filters. In read mode,
+%         If no filter options are provided, =all= is assumed. In write
+%         mode, none is assumed.
 %	  Supported values are =all=, =bzip2=, =compress=, =gzip=,
 %	  =grzip=, =lrzip=, =lzip=, =lzma=, =lzop=, =none=, =rpm=, =uu=
-%	  and =xz=. The value =all= is default.
+%	  and =xz=. The value =all= is default for read, =none= for write.
 %
 %	  * format(+Format)
 %	  Support the indicated format.  This option may be used
-%	  multiple times to support multiple formats. If no format
-%	  options are provided, =all= is assumed. Note that
+%	  multiple times to support multiple formats in read mode.
+%         In write mode, you must supply a single format. If no format
+%	  options are provided, =all= is assumed for read mode. Note that
 %	  =all= does *not* include =raw=. To open both archive
 %	  and non-archive files, _both_ format(all) and
 %	  format(raw) must be specified. Supported values are: =all=,
 %	  =7zip=, =ar=, =cab=, =cpio=, =empty=, =gnutar=, =iso9660=,
 %	  =lha=, =mtree=, =rar=, =raw=, =tar=, =xar= and =zip=. The
-%	  value =all= is default.
+%	  value =all= is default for read.
 %
 %	Note that the actually supported   compression types and formats
 %	may vary depending on the version   and  installation options of
@@ -120,14 +129,14 @@ The following example lists the entries in an archive:
 %	@error	domain_error(format, Format) if the requested
 %		format type is not supported.
 
-archive_open(stream(Stream), Archive, Options) :- !,
-	archive_open_stream(Stream, Archive, Options).
-archive_open(Stream, Archive, Options) :-
+archive_open(stream(Stream), Mode, Archive, Options) :- !,
+	archive_open_stream(Stream, Mode, Archive, Options).
+archive_open(Stream, Mode, Archive, Options) :-
 	is_stream(Stream), !,
-	archive_open_stream(Stream, Archive, Options).
-archive_open(File, Archive, Options) :-
-	open(File, read, Stream, [type(binary)]),
-	catch(archive_open_stream(Stream, Archive, [close_parent(true)|Options]),
+	archive_open_stream(Stream, Mode, Archive, Options).
+archive_open(File, Mode, Archive, Options) :-
+	open(File, Mode, Stream, [type(binary)]),
+	catch(archive_open_stream(Stream, Mode, Archive, [close_parent(true)|Options]),
 	      E, (close(Stream, [force(true)]), throw(E))).
 
 
@@ -193,6 +202,25 @@ defined_archive_property(filter(_)).
 %	Open the current entry as a stream. Stream must be closed.
 %	If the stream is not closed before the next call to
 %	archive_next_header/2, a permission error is raised.
+
+
+%%	archive_set_header_property(+Archive, +Property)
+%
+%	Set Property of the current header.  Write-mode only. Defined
+%	properties are:
+%
+%	  * filetype(-Type)
+%	  Type is one of =file=, =link=, =socket=, =character_device=,
+%	  =block_device=, =directory= or =fifo=.  It appears that this
+%	  library can also return other values.  These are returned as
+%	  an integer.
+%	  * mtime(-Time)
+%	  True when entry was last modified at time.
+%	  * size(-Bytes)
+%	  True when entry is Bytes long.
+%	  * link_target(-Target)
+%	  Target for a link. Currently only supported for symbolic
+%	  links.
 
 %%	archive_header_property(+Archive, ?Property)
 %
@@ -375,3 +403,49 @@ open_substream(In, Entry, ArchiveMetadata, PipeTailMetadata) :-
 			 ]),
 	    archive_content(Archive, Entry, ArchiveMetadata, PipeTailMetadata),
 	    archive_close(Archive)).
+
+
+%%      archive_create(+OutputFile, +InputFiles, +Options).
+%       Convenience predicate to create an archive in OutputFile
+%       with data from a list of InputFiles and the given Options.
+
+archive_create(OutputFile, InputFiles, Options) :-
+        option(directory(BaseDirectory), Options, '.'),
+        setup_call_cleanup(
+	    archive_open(OutputFile, write, Archive, Options),
+	    archive_create_1(Archive, BaseDirectory, InputFiles),
+	    archive_close(Archive)).
+
+archive_create_1(_, _, []) :- !.
+archive_create_1(Archive, Base, ['.'|Files]) :- !,
+	archive_create_1(Archive, Base, Files).
+archive_create_1(Archive, Base, ['..'|Files]) :- !,
+	archive_create_1(Archive, Base, Files).
+archive_create_1(Archive, Base, [File|Files]) :-
+        directory_file_path(Base, File, Filename),
+        archive_create_2(Archive, Filename),
+        archive_create_1(Archive, Base, Files).
+
+archive_create_2(Archive, Directory) :-
+        exists_directory(Directory), !,
+        archive_next_header(Archive, Directory),
+        time_file(Directory, Time),
+        archive_set_header_property(Archive, mtime(Time)),
+        archive_set_header_property(Archive, filetype(directory)),
+        archive_open_entry(Archive, EntryStream),
+        close(EntryStream),
+        directory_files(Directory, Files),
+        archive_create_1(Archive, Directory, Files).
+archive_create_2(Archive, Filename) :-
+        archive_next_header(Archive, Filename),
+        size_file(Filename, Size),
+        time_file(Filename, Time),
+        archive_set_header_property(Archive, size(Size)),
+        archive_set_header_property(Archive, mtime(Time)),
+        setup_call_cleanup(
+	    archive_open_entry(Archive, EntryStream),
+	    setup_call_cleanup(
+		open(Filename, read, DataStream, [type(binary)]),
+		copy_stream_data(DataStream, EntryStream),
+		close(DataStream)),
+	    close(EntryStream)).

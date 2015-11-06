@@ -56,6 +56,7 @@
 
 #ifndef HAVE_ARCHIVE_READ_FREE
 #define archive_read_free(ar) archive_read_finish(ar)
+#define archive_write_free(ar) archive_write_finish(ar)
 #endif
 
 #if ARCHIVE_VERSION_NUMBER < 3000000
@@ -107,7 +108,7 @@ typedef enum ar_status
 
 typedef struct archive_wrapper
 { atom_t		symbol;		/* Associated symbol */
-  IOSTREAM *		data;		/* Input data */
+  IOSTREAM *		data;		/* Underlying stream */
   unsigned int		type;		/* Type of format supported */
   int			magic;		/* magic code */
   ar_status		status;		/* Current status */
@@ -115,6 +116,7 @@ typedef struct archive_wrapper
   int			closed_archive;	/* Archive was closed with open entry */
   struct archive *	archive;	/* Actual archive handle */
   struct archive_entry *entry;		/* Current entry */
+  int                   how;            /* r/w mode */
 } archive_wrapper;
 
 static void free_archive(archive_wrapper *ar);
@@ -162,18 +164,44 @@ static atom_t ATOM_character_device;
 static atom_t ATOM_block_device;
 static atom_t ATOM_directory;
 static atom_t ATOM_fifo;
+static atom_t ATOM_read;
+static atom_t ATOM_write;
 
 static functor_t FUNCTOR_error2;
 static functor_t FUNCTOR_archive_error2;
+static functor_t FUNCTOR_existence_error3;
 static functor_t FUNCTOR_filetype1;
 static functor_t FUNCTOR_format1;
 static functor_t FUNCTOR_mtime1;
 static functor_t FUNCTOR_size1;
 static functor_t FUNCTOR_link_target1;
 
+
+static
+int PL_existence_error3(const char* type, const char* object, term_t in)
+{ term_t ex = PL_new_term_ref();
+
+  if ( PL_unify_term(ex,
+                     PL_FUNCTOR, FUNCTOR_error2,
+                     PL_FUNCTOR, FUNCTOR_existence_error3,
+                     PL_CHARS, type,
+                     PL_CHARS, object,
+                     PL_TERM, in,
+                     PL_VARIABLE))
+    return PL_raise_exception(ex);
+  return FALSE;
+}
+
 		 /*******************************
 		 *	  SYMBOL WRAPPER	*
 		 *******************************/
+
+static int archive_free_handle(archive_wrapper *ar)
+{ if ( ar->how == 'r' )
+    return archive_read_free(ar->archive);
+  else
+    return archive_write_free(ar->archive);
+}
 
 static void
 acquire_archive(atom_t symbol)
@@ -191,7 +219,8 @@ release_archive(atom_t symbol)
 
   if ( (a=ar->archive) )
   { ar->archive = NULL;
-    archive_read_free(a);
+    archive_free_handle(ar);
+    
   }
 
   free_archive(ar);
@@ -260,14 +289,13 @@ get_archive(term_t t, archive_wrapper **arp)
 		 *******************************/
 
 static int
-ar_open(struct archive *a, void *cdata)
+ar_open(struct archive *a, void *cdata)   
 { return ARCHIVE_OK;
 }
 
 static int
 ar_close(struct archive *a, void *cdata)
 { archive_wrapper *ar = cdata;
-
   PL_release_stream(ar->data);
   if ( ar->close_parent && ar->archive )
   { if ( Sclose(ar->data) != 0 )
@@ -284,7 +312,6 @@ ar_close(struct archive *a, void *cdata)
 static ssize_t
 ar_read(struct archive *a, void *cdata, const void **buffer)
 { archive_wrapper *ar = cdata;
-
   if ( Sfeof(ar->data) )
   { return 0;
   } else
@@ -296,6 +323,12 @@ ar_read(struct archive *a, void *cdata, const void **buffer)
 
     return bytes;
   }
+}
+
+static ssize_t
+ar_write(struct archive *a, void *cdata, const void *buffer, size_t n)
+{ archive_wrapper *ar = cdata;
+  return Sfwrite(buffer, 1, n, ar->data);
 }
 
 #ifndef __LA_INT64_T
@@ -406,6 +439,8 @@ archive_error(archive_wrapper *ar)
 #define	FILTER_XZ	  0x00000800
 #endif
 
+#define FILTER_MASK       0x0000ffff
+
 #ifdef HAVE_ARCHIVE_READ_SUPPORT_FORMAT_7ZIP
 #define FORMAT_7ZIP	  0x00010000
 #endif
@@ -462,24 +497,41 @@ enable_type(archive_wrapper *ar, int type,
 }
 
 static foreign_t
-archive_open_stream(term_t data, term_t handle, term_t options)
+archive_open_stream(term_t data, term_t mode, term_t handle, term_t options)
 { IOSTREAM *datas;
   archive_wrapper *ar;
   term_t tail = PL_copy_term_ref(options);
   term_t head = PL_new_term_ref();
   term_t arg  = PL_new_term_ref();
-
-  if ( !PL_get_stream_handle(data, &datas) )
-    return FALSE;
-  if ( !(datas->flags & SIO_INPUT) )
-  { PL_release_stream(datas);
-    return PL_domain_error("input_stream", data);
+  atom_t mname;
+  char how = 'r';
+  int flags = 0;
+  
+  if ( PL_get_atom(mode, &mname) )
+  { if ( mname == ATOM_write )
+    { how = 'w';
+      flags = SIO_OUTPUT;
+    }
+    else if ( mname == ATOM_read )
+    { how = 'r';
+      flags = SIO_INPUT;
+    }
+    else
+    { PL_domain_error("io_mode", mode);       
+    }
+  } else
+  { PL_type_error("atom", mode);
   }
 
+  if ( !PL_get_stream(data, &datas, flags) )
+    return FALSE;
+  
   ar = PL_malloc(sizeof(*ar));
   memset(ar, 0, sizeof(*ar));
   ar->data = datas;
+  ar->how = how;
   ar->magic = ARCHIVE_MAGIC;
+  
   if ( !PL_unify_blob(handle, ar, sizeof(*ar), &archive_blob) )
     return FALSE;
 
@@ -495,9 +547,13 @@ archive_open_stream(term_t data, term_t handle, term_t options)
 
       if ( !PL_get_atom_ex(arg, &c) )
 	return FALSE;
-
+      if ( how == 'w' && ((ar->type & FILTER_MASK) != 0) )
+         return PL_permission_error("set", "filter", arg);
       if ( c == ATOM_all )
+      { if (how == 'w')
+          return PL_domain_error("write_filter", arg);
 	ar->type |= FILTER_ALL;
+      }
 #ifdef FILTER_BZIP2
       else if ( c == ATOM_bzip2 )
 	ar->type |= FILTER_BZIP2;
@@ -553,9 +609,13 @@ archive_open_stream(term_t data, term_t handle, term_t options)
 
       if ( !PL_get_atom_ex(arg, &f) )
 	return FALSE;
-
+      if ( how == 'w' && (( ar->type & FORMAT_MASK ) != 0 ) )
+          return PL_permission_error("set", "format", arg);
       if ( f == ATOM_all )
+      { if ( how == 'w' )
+          return PL_domain_error("write_format", arg);
 	ar->type |= FORMAT_ALL;
+      }
 #ifdef FORMAT_7ZIP
       else if ( f == ATOM_7zip )
 	ar->type |= FORMAT_7ZIP;
@@ -622,126 +682,204 @@ archive_open_stream(term_t data, term_t handle, term_t options)
   if ( !PL_get_nil_ex(tail) )
     return FALSE;
 
-  if ( !(ar->type & FILTER_ALL) )
-    ar->type |= FILTER_ALL;
-  if ( !(ar->type & FORMAT_MASK) )
-    ar->type |= FORMAT_ALL;
-
-  if ( !(ar->archive = archive_read_new()) )
-    return PL_resource_error("memory");
-
-  if ( (ar->type & FILTER_ALL) == FILTER_ALL )
-  { archive_read_support_filter_all(ar->archive);
-  } else
-  {
+  if ( how == 'r' )
+  { if ( !(ar->type & FILTER_ALL) )
+      ar->type |= FILTER_ALL;
+    if ( !(ar->type & FORMAT_MASK) )
+      ar->type |= FORMAT_ALL;
+  }
+  if ( how == 'r' )
+  { if ( !(ar->archive = archive_read_new()) )
+      return PL_resource_error("memory");
+     
+     if ( (ar->type & FILTER_ALL) == FILTER_ALL )
+     { archive_read_support_filter_all(ar->archive);
+     } else
+     {
 #ifdef FILTER_BZIP2
-    enable_type(ar, FILTER_BZIP2,    archive_read_support_filter_bzip2);
+       enable_type(ar, FILTER_BZIP2,    archive_read_support_filter_bzip2);
 #endif
 #ifdef FILTER_COMPRESS
-    enable_type(ar, FILTER_COMPRESS, archive_read_support_filter_compress);
+       enable_type(ar, FILTER_COMPRESS, archive_read_support_filter_compress);
 #endif
 #ifdef FILTER_GZIP
-    enable_type(ar, FILTER_GZIP,     archive_read_support_filter_gzip);
+       enable_type(ar, FILTER_GZIP,     archive_read_support_filter_gzip);
 #endif
 #ifdef FILTER_GRZIP
-    enable_type(ar, FILTER_GRZIP,     archive_read_support_filter_grzip);
+       enable_type(ar, FILTER_GRZIP,     archive_read_support_filter_grzip);
 #endif
 #ifdef FILTER_LRZIP
-    enable_type(ar, FILTER_LRZIP,     archive_read_support_filter_lrzip);
+       enable_type(ar, FILTER_LRZIP,     archive_read_support_filter_lrzip);
 #endif
 #ifdef FILTER_LZIP
-    enable_type(ar, FILTER_LZIP,     archive_read_support_filter_lzip);
+       enable_type(ar, FILTER_LZIP,     archive_read_support_filter_lzip);
 #endif
 #ifdef FILTER_LZMA
-    enable_type(ar, FILTER_LZMA,     archive_read_support_filter_lzma);
+       enable_type(ar, FILTER_LZMA,     archive_read_support_filter_lzma);
 #endif
 #ifdef FILTER_LZOP
-    enable_type(ar, FILTER_LZOP,     archive_read_support_filter_lzop);
+       enable_type(ar, FILTER_LZOP,     archive_read_support_filter_lzop);
 #endif
 #ifdef FILTER_NONE
-    enable_type(ar, FILTER_NONE,     archive_read_support_filter_none);
+       enable_type(ar, FILTER_NONE,     archive_read_support_filter_none);
 #endif
 #ifdef FILTER_RPM
-    enable_type(ar, FILTER_RPM,      archive_read_support_filter_rpm);
+       enable_type(ar, FILTER_RPM,      archive_read_support_filter_rpm);
 #endif
 #ifdef FILTER_UU
-    enable_type(ar, FILTER_UU,       archive_read_support_filter_uu);
+       enable_type(ar, FILTER_UU,       archive_read_support_filter_uu);
 #endif
 #ifdef FILTER_XZ
-    enable_type(ar, FILTER_XZ,       archive_read_support_filter_xz);
+       enable_type(ar, FILTER_XZ,       archive_read_support_filter_xz);
 #endif
-  }
+     }
 
-  if ( (ar->type & FORMAT_ALL) == FORMAT_ALL )
-  { archive_read_support_format_all(ar->archive);
+     if ( (ar->type & FORMAT_ALL) == FORMAT_ALL )
+     { archive_read_support_format_all(ar->archive);
 #ifdef FORMAT_RAW
-    enable_type(ar, FORMAT_RAW,     archive_read_support_format_raw);
+       enable_type(ar, FORMAT_RAW,     archive_read_support_format_raw);
 #endif
-  } else
-  {
+     } else
+     {
 #ifdef FORMAT_7ZIP
-    enable_type(ar, FORMAT_7ZIP,    archive_read_support_format_7zip);
+       enable_type(ar, FORMAT_7ZIP,    archive_read_support_format_7zip);
 #endif
 #ifdef FORMAT_AR
-    enable_type(ar, FORMAT_AR,      archive_read_support_format_ar);
+       enable_type(ar, FORMAT_AR,      archive_read_support_format_ar);
 #endif
 #ifdef FORMAT_CAB
-    enable_type(ar, FORMAT_CAB,     archive_read_support_format_cab);
+       enable_type(ar, FORMAT_CAB,     archive_read_support_format_cab);
 #endif
 #ifdef FORMAT_CPIO
-    enable_type(ar, FORMAT_CPIO,    archive_read_support_format_cpio);
+       enable_type(ar, FORMAT_CPIO,    archive_read_support_format_cpio);
 #endif
 #ifdef FORMAT_EMPTY
-    enable_type(ar, FORMAT_EMPTY,   archive_read_support_format_empty);
+       enable_type(ar, FORMAT_EMPTY,   archive_read_support_format_empty);
 #endif
 #ifdef FORMAT_GNUTAR
-    enable_type(ar, FORMAT_GNUTAR,  archive_read_support_format_gnutar);
+       enable_type(ar, FORMAT_GNUTAR,  archive_read_support_format_gnutar);
 #endif
 #ifdef FORMAT_ISO9960
-    enable_type(ar, FORMAT_ISO9960, archive_read_support_format_iso9660);
+       enable_type(ar, FORMAT_ISO9960, archive_read_support_format_iso9660);
 #endif
 #ifdef FORMAT_LHA
-    enable_type(ar, FORMAT_LHA,     archive_read_support_format_lha);
+       enable_type(ar, FORMAT_LHA,     archive_read_support_format_lha);
 #endif
 #ifdef FORMAT_MTREE
-    enable_type(ar, FORMAT_MTREE,   archive_read_support_format_mtree);
+       enable_type(ar, FORMAT_MTREE,   archive_read_support_format_mtree);
 #endif
 #ifdef FORMAT_RAR
-    enable_type(ar, FORMAT_RAR,     archive_read_support_format_rar);
+       enable_type(ar, FORMAT_RAR,     archive_read_support_format_rar);
 #endif
 #ifdef FORMAT_RAW
-    enable_type(ar, FORMAT_RAW,     archive_read_support_format_raw);
+       enable_type(ar, FORMAT_RAW,     archive_read_support_format_raw);
 #endif
 #ifdef FORMAT_TAR
-    enable_type(ar, FORMAT_TAR,     archive_read_support_format_tar);
+       enable_type(ar, FORMAT_TAR,     archive_read_support_format_tar);
 #endif
 #ifdef FORMAT_XAR
-    enable_type(ar, FORMAT_XAR,     archive_read_support_format_xar);
+       enable_type(ar, FORMAT_XAR,     archive_read_support_format_xar);
 #endif
 #ifdef FORMAT_ZIP
-    enable_type(ar, FORMAT_ZIP,     archive_read_support_format_zip);
+       enable_type(ar, FORMAT_ZIP,     archive_read_support_format_zip);
 #endif
-  }
-
+     }
 #ifdef HAVE_ARCHIVE_READ_OPEN1
-  archive_read_set_callback_data(ar->archive, ar);
-  archive_read_set_open_callback(ar->archive, ar_open);
-  archive_read_set_read_callback(ar->archive, ar_read);
-  archive_read_set_skip_callback(ar->archive, ar_skip);
-  archive_read_set_seek_callback(ar->archive, ar_seek);
-  archive_read_set_close_callback(ar->archive, ar_close);
-
-  if ( archive_read_open1(ar->archive) == ARCHIVE_OK )
-  { ar->status = AR_OPENED;
-    return TRUE;
-  }
+     archive_read_set_callback_data(ar->archive, ar);
+     archive_read_set_open_callback(ar->archive, ar_open);
+     archive_read_set_read_callback(ar->archive, ar_read);
+     archive_read_set_skip_callback(ar->archive, ar_skip);
+     archive_read_set_seek_callback(ar->archive, ar_seek);
+     archive_read_set_close_callback(ar->archive, ar_close);
+     
+     if ( archive_read_open1(ar->archive) == ARCHIVE_OK )
+     { ar->status = AR_OPENED;
+       return TRUE;
+     }
 #else
-  if ( archive_read_open2(ar->archive, ar,
-			  ar_open, ar_read, ar_skip, ar_close) == ARCHIVE_OK )
-  { ar->status = AR_OPENED;
-    return TRUE;
-  }
+     if ( archive_read_open2(ar->archive, ar,
+                             ar_open, ar_read, ar_skip, ar_close) == ARCHIVE_OK )
+     { ar->status = AR_OPENED;
+       return TRUE;
+     }
 #endif
+  } else if ( how == 'w' )
+  { if ( !(ar->archive = archive_write_new()) )
+      return PL_resource_error("memory");
+     if (0) {}
+#ifdef FORMAT_7ZIP
+     else if ( ar->type & FORMAT_7ZIP )    archive_write_set_format_7zip(ar->archive);
+#endif
+#ifdef FORMAT_CPIO
+     else if ( ar->type & FORMAT_CPIO )    archive_write_set_format_cpio(ar->archive);
+#endif
+#ifdef FORMAT_GNUTAR
+     else if ( ar->type & FORMAT_GNUTAR )  archive_write_set_format_gnutar(ar->archive);
+#endif
+#ifdef FORMAT_ISO9660
+     else if ( ar->type & FORMAT_ISO9660 ) archive_write_set_format_iso9660(ar->archive);
+#endif
+#ifdef FORMAT_XAR
+     else if ( ar->type & FORMAT_XAR )     archive_write_set_format_xar(ar->archive);
+#endif
+#ifdef FORMAT_ZIP
+    else if ( ar->type & FORMAT_ZIP )      archive_write_set_format_zip(ar->archive);
+#endif
+    else
+    { return PL_existence_error3("option", "format", options);
+    }
+
+
+     if (0)  {}
+#ifdef FILTER_BZIP2
+    else if ( ar->type & FILTER_BZIP2 )    archive_write_add_filter_bzip2(ar->archive);
+#endif
+#ifdef FILTER_COMPRESS
+    else if ( ar->type & FILTER_COMPRESS ) archive_write_add_filter_none(ar->archive);
+#endif
+#ifdef FILTER_GZIP
+    else if ( ar->type & FILTER_GZIP )     archive_write_add_filter_gzip(ar->archive);
+#endif
+#ifdef FILTER_GRZIP
+    else if ( ar->type & FILTER_GRZIP )    archive_write_add_filter_grzip(ar->archive);
+#endif
+#ifdef FILTER_LRZIP
+    else if ( ar->type & FILTER_LRZIP )    archive_write_add_filter_lrzip(ar->archive);
+#endif
+#ifdef FILTER_LZMA
+    else if ( ar->type & FILTER_LZMA )     archive_write_add_filter_lzma(ar->archive);
+#endif
+#ifdef FILTER_LZOP
+    else if ( ar->type & FILTER_LZMA )     archive_write_add_filter_lzop(ar->archive);
+#endif
+#ifdef FILTER_XZ
+    else if ( ar->type & FILTER_XZ )       archive_write_add_filter_xz(ar->archive);
+#endif
+#ifdef FILTER_NONE
+    else                                   archive_write_add_filter_none(ar->archive);
+#else
+    else
+    { return PL_existence_error3("option", "filter", options);
+    }
+#endif
+#ifdef HAVE_ARCHIVE_WRITE_OPEN1
+    archive_write_set_callback_data(ar->archive, ar);
+    archive_write_set_open_callback(ar->archive, ar_open);
+    archive_write_set_write_callback(ar->archive, ar_write);
+    archive_write_set_close_callback(ar->archive, ar_close);
+    
+    if ( archive_write_open1(ar->archive) == ARCHIVE_OK )
+    { ar->status = AR_OPENED;
+      return TRUE;
+    }
+#else
+    if ( archive_write_open(ar->archive, ar,
+                             ar_open, ar_write, ar_close) == ARCHIVE_OK )
+    { ar->status = AR_OPENED;
+      return TRUE;
+    }
+#endif
+  }
 
   return archive_error(ar);
 }
@@ -788,6 +926,25 @@ archive_next_header(term_t archive, term_t name)
 
   if ( !get_archive(archive, &ar) )
     return FALSE;
+  if ( ar->how == 'w' )
+  { char* pathname = NULL;
+    if ( ar->status == AR_OPENED_ENTRY )
+       return PL_permission_error("next_header", "archive", archive);
+    if ( !PL_get_atom_chars(name, &pathname) )
+       return PL_type_error("atom", name);
+    ar->entry = archive_entry_new();
+    if ( ar->entry == NULL )
+       return PL_resource_error("memory");
+    archive_entry_set_pathname(ar->entry, pathname);
+    /* libarchive-3.1.2 does not tolerate an empty size with zip. Later versions may though - it is fixed in git as of Dec 2013.
+     *    For now, set the other entries to a sensible default
+     */
+    archive_entry_unset_size(ar->entry);
+    archive_entry_set_filetype(ar->entry, AE_IFREG);
+    archive_entry_set_perm(ar->entry, 0644);
+    ar->status = AR_NEW_ENTRY;
+    return TRUE;
+  }
   if ( ar->status == AR_NEW_ENTRY )
     archive_read_data_skip(ar->archive);
   if ( ar->status == AR_OPENED_ENTRY )
@@ -822,7 +979,7 @@ archive_close(term_t archive)
   { ar->closed_archive = TRUE;
 
     return TRUE;
-  } else if ( (rc=archive_read_free(ar->archive)) == ARCHIVE_OK )
+  } else if ( (rc=archive_free_handle(ar)) == ARCHIVE_OK )
   { ar->entry = NULL;
     ar->archive = NULL;
     ar->symbol = 0;
@@ -919,6 +1076,71 @@ archive_header_prop(term_t archive, term_t field)
   return PL_domain_error("archive_header_property", field);
 }
 
+static foreign_t
+archive_set_header_property(term_t archive, term_t field)
+{ archive_wrapper *ar;
+  functor_t prop;
+  
+  if ( !get_archive(archive, &ar) )
+    return FALSE;
+
+  if ( !PL_get_functor(field, &prop) )
+    return PL_type_error("compound", field);
+  if ( ar->status != AR_NEW_ENTRY )
+    return PL_permission_error("access", "archive_entry", archive);
+  if ( ar->how != 'w' )
+    return PL_permission_error("write", "archive_entry", archive);
+
+  if ( prop == FUNCTOR_filetype1 )
+  { atom_t name;
+    term_t arg = PL_new_term_ref();
+    __LA_MODE_T type;
+    _PL_get_arg(1, field, arg);
+    if ( !PL_get_atom(arg, &name) )
+       return PL_type_error("atom", arg);
+    if (name == ATOM_file)                  type = AE_IFREG;
+    else if (name == ATOM_link)             type = AE_IFLNK;
+    else if (name == ATOM_socket)           type = AE_IFSOCK;
+    else if (name == ATOM_character_device) type = AE_IFCHR;
+    else if (name == ATOM_block_device)     type = AE_IFBLK;
+    else if (name == ATOM_directory)        type = AE_IFDIR;
+    else if (name == ATOM_fifo)             type = AE_IFIFO;
+    else
+       return PL_domain_error("filetype", arg);
+    archive_entry_set_filetype(ar->entry, type);
+    PL_succeed;
+  } else if (prop == FUNCTOR_mtime1)
+  { double mtime;
+    term_t arg = PL_new_term_ref();
+    _PL_get_arg(1, field, arg);
+    if ( !PL_get_float(arg, &mtime) )
+       return PL_type_error("float", arg);
+    archive_entry_set_mtime(ar->entry, (time_t)mtime, 0);
+    PL_succeed;
+  } else if (prop == FUNCTOR_size1)
+  { int64_t size;
+    term_t arg = PL_new_term_ref();
+    _PL_get_arg(1, field, arg);
+    if ( !PL_get_int64(arg, &size) )
+       return PL_type_error("size", arg);
+    archive_entry_set_size(ar->entry, size);
+    PL_succeed;
+  } else if (prop == FUNCTOR_link_target1)
+  { const wchar_t* link;
+    atom_t atom;
+    size_t len;
+    term_t arg = PL_new_term_ref();
+    _PL_get_arg(1, field, arg);
+    if ( !PL_get_atom(arg, &atom) )
+      return PL_type_error("atom", arg);
+    link = PL_atom_wchars(atom, &len);           
+    archive_entry_copy_symlink_w(ar->entry, link);
+    archive_entry_set_filetype(ar->entry, AE_IFLNK);
+    PL_succeed;
+  } else
+    return PL_domain_error("archive_header_property", field);
+}
+
 
 		 /*******************************
 		 *	    READ MEMBERS	*
@@ -931,15 +1153,31 @@ ar_read_entry(void *handle, char *buf, size_t size)
   return archive_read_data(ar->archive, buf, size);
 }
 
+static ssize_t
+ar_write_entry(void *handle, char *buf, size_t size)
+{ archive_wrapper *ar = handle;
+
+  size_t written = archive_write_data(ar->archive, buf, size);
+  /* In older version of libarchive (at least until 3.1.12), archive_write_data returns 0 for
+     some formats if the file size is not set. It does not set archive_errno(), unfortunately.
+     We turn this into an IO error here by returning -1
+  */
+  if (written == 0)
+  { errno = ENOSPC;
+    return -1;
+  }
+  return written;
+}
+
+
 static int
 ar_close_entry(void *handle)
 { archive_wrapper *ar = handle;
-
   if ( ar->closed_archive )
   { if ( ar->archive )
     { int rc;
 
-      if ( (rc=archive_read_free(ar->archive)) == ARCHIVE_OK )
+      if ( (rc=archive_free_handle(ar)) == ARCHIVE_OK )
       { ar->entry = NULL;
 	ar->archive = NULL;
 	ar->symbol = 0;
@@ -951,7 +1189,6 @@ ar_close_entry(void *handle)
   { PL_unregister_atom(ar->symbol);
     ar->status = AR_CLOSED_ENTRY;
   }
-
   return 0;
 }
 
@@ -967,14 +1204,25 @@ ar_control_entry(void *handle, int op, void *data)
     case SIO_GETSIZE:
       *((int64_t*)data) = archive_entry_size(ar->entry);
       return 0;
+    case SIO_FLUSHOUTPUT:
+       return 0;
     default:
       return -1;
   }
 }
 
-static IOFUNCTIONS ar_entry_functions =
+static IOFUNCTIONS ar_entry_read_functions =
 { ar_read_entry,
   NULL,
+  NULL,					/* seek */
+  ar_close_entry,
+  ar_control_entry,			/* control */
+  NULL,					/* seek64 */
+};
+
+static IOFUNCTIONS ar_entry_write_functions =
+{ NULL,
+  ar_write_entry,
   NULL,					/* seek */
   ar_close_entry,
   ar_control_entry,			/* control */
@@ -988,15 +1236,34 @@ archive_open_entry(term_t archive, term_t stream)
 
   if ( !get_archive(archive, &ar) )
     return FALSE;
-
-  if ( (s=Snew(ar, SIO_INPUT|SIO_RECORDPOS, &ar_entry_functions)) )
-  { ar->status = AR_OPENED_ENTRY;
-    if ( PL_unify_stream(stream, s) )
-    { PL_register_atom(ar->symbol);	/* We may no longer reference the */
-      return TRUE;			/* archive itself */
+  if ( ar->how == 'r' )
+  { if ( (s=Snew(ar, SIO_INPUT|SIO_RECORDPOS, &ar_entry_read_functions)) )
+    { ar->status = AR_OPENED_ENTRY;
+      if ( PL_unify_stream(stream, s) )
+      { PL_register_atom(ar->symbol);	/* We may no longer reference the */
+        return TRUE;			/* archive itself */
+      }
+      Sclose(s);
+      return FALSE;
     }
-    Sclose(s);
-    return FALSE;
+  } else if ( ar->how == 'w' )
+  { /* First we must finalize the header before trying to write the data */
+    if ( ar->status == AR_NEW_ENTRY )
+    { archive_write_header(ar->archive, ar->entry);
+      archive_entry_free(ar->entry);
+    } else
+    { return PL_permission_error("access", "archive_entry", archive);
+    }
+    /* Then we can make a handle for the data */
+    if ( (s=Snew(ar, SIO_OUTPUT|SIO_RECORDPOS, &ar_entry_write_functions)) )
+    { ar->status = AR_OPENED_ENTRY;
+      if ( PL_unify_stream(stream, s) )
+      { PL_register_atom(ar->symbol);	/* We may no longer reference the */
+        return TRUE;			/* archive itself */
+      }
+      Sclose(s);
+      return FALSE;
+    }
   }
 
   return PL_resource_error("memory");
@@ -1052,19 +1319,23 @@ install_archive4pl(void)
   MKATOM(block_device);
   MKATOM(directory);
   MKATOM(fifo);
+  MKATOM(write);
+  MKATOM(read);
 
-  MKFUNCTOR(error,         2);
-  MKFUNCTOR(archive_error, 2);
-  MKFUNCTOR(filetype,      1);
-  MKFUNCTOR(mtime,         1);
-  MKFUNCTOR(size,          1);
-  MKFUNCTOR(link_target,   1);
-  MKFUNCTOR(format,        1);
+  MKFUNCTOR(error,           2);
+  MKFUNCTOR(archive_error,   2);
+  MKFUNCTOR(existence_error, 3);
+  MKFUNCTOR(filetype,        1);
+  MKFUNCTOR(mtime,           1);
+  MKFUNCTOR(size,            1);
+  MKFUNCTOR(link_target,     1);
+  MKFUNCTOR(format,          1);
 
-  PL_register_foreign("archive_open_stream",  3, archive_open_stream, 0);
+  PL_register_foreign("archive_open_stream",  4, archive_open_stream, 0);
   PL_register_foreign("archive_property",     3, archive_property,    0);
   PL_register_foreign("archive_close",        1, archive_close,       0);
   PL_register_foreign("archive_next_header",  2, archive_next_header, 0);
   PL_register_foreign("archive_header_prop_", 2, archive_header_prop, 0);
+  PL_register_foreign("archive_set_header_property", 2, archive_set_header_property, 0);
   PL_register_foreign("archive_open_entry",   2, archive_open_entry,  0);
 }
