@@ -21,6 +21,7 @@
     02110-1301  USA
 */
 
+#include <config.h>
 #include <SWI-Stream.h>
 #include <SWI-Prolog.h>
 #ifdef __WINDOWS__
@@ -484,7 +485,7 @@ archive_open_stream(term_t data, term_t handle, term_t options)
 
   while( PL_get_list_ex(tail, head, tail) )
   { atom_t name;
-    int arity;
+    size_t arity;
 
     if ( !PL_get_name_arity(head, &name, &arity) ||
 	 !PL_get_arg(1, head, arg) )

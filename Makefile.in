@@ -12,6 +12,7 @@
 PACKAGE=archive
 DOC=archive
 include ../Makefile.defs
+CFLAGS+= -I.
 
 # COFLAGS=-gdwarf-2 -g3
 
