@@ -1,6 +1,6 @@
 /*  Part of SWI-Prolog
 
-    Author:        Jan Wielemaker
+    Author:        Jan Wielemaker and Matt Lilley
     E-mail:        J.Wielemaker@cs.vu.nl
     WWW:           http://www.swi-prolog.org
     Copyright (C): 2012-2015, VU University Amsterdam
@@ -43,6 +43,7 @@
 	    archive_data_stream/3	% +Archive, -DataStream, +Options
 	  ]).
 :- use_module(library(error)).
+:- use_module(library(option)).
 :- use_module(library(filesex)).
 
 /** <module> Access several archive formats
@@ -405,26 +406,27 @@ open_substream(In, Entry, ArchiveMetadata, PipeTailMetadata) :-
 	    archive_close(Archive)).
 
 
-%%      archive_create(+OutputFile, +InputFiles, +Options).
-%       Convenience predicate to create an archive in OutputFile
-%       with data from a list of InputFiles and the given Options.
+%%      archive_create(+OutputFile, +InputFiles, +Options) is det.
+%
+%	Convenience predicate to create an   archive  in OutputFile with
+%	data from a list of InputFiles and the given Options.
 
 archive_create(OutputFile, InputFiles, Options) :-
         option(directory(BaseDirectory), Options, '.'),
         setup_call_cleanup(
 	    archive_open(OutputFile, write, Archive, Options),
-	    archive_create_1(Archive, BaseDirectory, InputFiles),
+	    archive_create_1(Archive, BaseDirectory, InputFiles, top),
 	    archive_close(Archive)).
 
-archive_create_1(_, _, []) :- !.
-archive_create_1(Archive, Base, ['.'|Files]) :- !,
-	archive_create_1(Archive, Base, Files).
-archive_create_1(Archive, Base, ['..'|Files]) :- !,
-	archive_create_1(Archive, Base, Files).
-archive_create_1(Archive, Base, [File|Files]) :-
+archive_create_1(_, _, [], _) :- !.
+archive_create_1(Archive, Base, ['.'|Files], sub) :- !,
+	archive_create_1(Archive, Base, Files, sub).
+archive_create_1(Archive, Base, ['..'|Files], Where) :- !,
+	archive_create_1(Archive, Base, Files, Where).
+archive_create_1(Archive, Base, [File|Files], Where) :-
         directory_file_path(Base, File, Filename),
         archive_create_2(Archive, Filename),
-        archive_create_1(Archive, Base, Files).
+        archive_create_1(Archive, Base, Files, Where).
 
 archive_create_2(Archive, Directory) :-
         exists_directory(Directory), !,
@@ -435,7 +437,7 @@ archive_create_2(Archive, Directory) :-
         archive_open_entry(Archive, EntryStream),
         close(EntryStream),
         directory_files(Directory, Files),
-        archive_create_1(Archive, Directory, Files).
+        archive_create_1(Archive, Directory, Files, sub).
 archive_create_2(Archive, Filename) :-
         archive_next_header(Archive, Filename),
         size_file(Filename, Size),
