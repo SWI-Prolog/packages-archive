@@ -410,36 +410,47 @@ open_substream(In, Entry, ArchiveMetadata, PipeTailMetadata) :-
 %
 %	Convenience predicate to create an   archive  in OutputFile with
 %	data from a list of InputFiles and the given Options.
+%
+%	Besides options supported by archive_open/4, one more option is
+%	supported as following:
+%
+%	  * directory(+Directory)
+%   Changes the directory before adding input files. If this is
+%   specified,   paths of  input  files   must   be relative to
+%   = Directory = and archived files will not have = Directory =
+%   as leading path. This is to simulate = -C = option of = tar =.
 
 archive_create(OutputFile, InputFiles, Options) :-
         option(directory(BaseDirectory), Options, '.'),
         setup_call_cleanup(
 	    archive_open(OutputFile, write, Archive, Options),
-	    archive_create_1(Archive, BaseDirectory, InputFiles, top),
+	    archive_create_1(Archive, BaseDirectory, BaseDirectory, InputFiles, top),
 	    archive_close(Archive)).
 
-archive_create_1(_, _, [], _) :- !.
-archive_create_1(Archive, Base, ['.'|Files], sub) :- !,
-	archive_create_1(Archive, Base, Files, sub).
-archive_create_1(Archive, Base, ['..'|Files], Where) :- !,
-	archive_create_1(Archive, Base, Files, Where).
-archive_create_1(Archive, Base, [File|Files], Where) :-
-        directory_file_path(Base, File, Filename),
-        archive_create_2(Archive, Filename),
-        archive_create_1(Archive, Base, Files, Where).
+archive_create_1(_, _, _, [], _) :- !.
+archive_create_1(Archive, Base, Current, ['.'|Files], sub) :- !,
+	archive_create_1(Archive, Base, Current, Files, sub).
+archive_create_1(Archive, Base, Current, ['..'|Files], Where) :- !,
+	archive_create_1(Archive, Base, Current, Files, Where).
+archive_create_1(Archive, Base, Current, [File|Files], Where) :-
+        directory_file_path(Current, File, Filename),
+        archive_create_2(Archive, Base, Filename),
+        archive_create_1(Archive, Base, Current, Files, Where).
 
-archive_create_2(Archive, Directory) :-
+archive_create_2(Archive, Base, Directory) :-
         exists_directory(Directory), !,
-        archive_next_header(Archive, Directory),
+        entry_name(Base, Directory, Directory0),
+        archive_next_header(Archive, Directory0),
         time_file(Directory, Time),
         archive_set_header_property(Archive, mtime(Time)),
         archive_set_header_property(Archive, filetype(directory)),
         archive_open_entry(Archive, EntryStream),
         close(EntryStream),
         directory_files(Directory, Files),
-        archive_create_1(Archive, Directory, Files, sub).
-archive_create_2(Archive, Filename) :-
-        archive_next_header(Archive, Filename),
+        archive_create_1(Archive, Base, Directory, Files, sub).
+archive_create_2(Archive, Base, Filename) :-
+        entry_name(Base, Filename, Filename0),
+        archive_next_header(Archive, Filename0),
         size_file(Filename, Size),
         time_file(Filename, Time),
         archive_set_header_property(Archive, size(Size)),
@@ -451,3 +462,7 @@ archive_create_2(Archive, Filename) :-
 		copy_stream_data(DataStream, EntryStream),
 		close(DataStream)),
 	    close(EntryStream)).
+
+entry_name('.', Name, Name) :- !.
+entry_name(Base, Name, EntryName) :-
+  directory_file_path(Base, EntryName, Name).
