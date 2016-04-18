@@ -231,7 +231,7 @@ release_archive(atom_t symbol)
   if ( (a=ar->archive) )
   { ar->archive = NULL;
     archive_free_handle(ar);
-    
+
   }
 
   free_archive(ar);
@@ -300,7 +300,7 @@ get_archive(term_t t, archive_wrapper **arp)
 		 *******************************/
 
 static int
-ar_open(struct archive *a, void *cdata)   
+ar_open(struct archive *a, void *cdata)
 { return ARCHIVE_OK;
 }
 
@@ -324,7 +324,9 @@ static ssize_t
 ar_read(struct archive *a, void *cdata, const void **buffer)
 { archive_wrapper *ar = cdata;
   if ( Sfeof(ar->data) )
-  { return 0;
+  { if ( Sferror(ar->data) )
+      return -1;
+    return 0;
   } else
   { ssize_t bytes = ar->data->limitp - ar->data->bufp;
 
@@ -407,6 +409,9 @@ archive_error(archive_wrapper *ar)
 
     return FALSE;
   }
+
+  if ( PL_exception(0) )
+    return FALSE;
 
   return TRUE;
 }
@@ -517,7 +522,7 @@ archive_open_stream(term_t data, term_t mode, term_t handle, term_t options)
   atom_t mname;
   char how = 'r';
   int flags = 0;
-  
+
   if ( PL_get_atom(mode, &mname) )
   { if ( mname == ATOM_write )
     { how = 'w';
@@ -528,7 +533,7 @@ archive_open_stream(term_t data, term_t mode, term_t handle, term_t options)
       flags = SIO_INPUT;
     }
     else
-    { PL_domain_error("io_mode", mode);       
+    { PL_domain_error("io_mode", mode);
     }
   } else
   { PL_type_error("atom", mode);
@@ -536,13 +541,13 @@ archive_open_stream(term_t data, term_t mode, term_t handle, term_t options)
 
   if ( !PL_get_stream(data, &datas, flags) )
     return FALSE;
-  
+
   ar = PL_malloc(sizeof(*ar));
   memset(ar, 0, sizeof(*ar));
   ar->data = datas;
   ar->how = how;
   ar->magic = ARCHIVE_MAGIC;
-  
+
   if ( !PL_unify_blob(handle, ar, sizeof(*ar), &archive_blob) )
     return FALSE;
 
@@ -702,7 +707,7 @@ archive_open_stream(term_t data, term_t mode, term_t handle, term_t options)
   if ( how == 'r' )
   { if ( !(ar->archive = archive_read_new()) )
       return PL_resource_error("memory");
-     
+
      if ( (ar->type & FILTER_ALL) == FILTER_ALL )
      { archive_read_support_filter_all(ar->archive);
      } else
@@ -802,7 +807,7 @@ archive_open_stream(term_t data, term_t mode, term_t handle, term_t options)
      archive_read_set_skip_callback(ar->archive, ar_skip);
      archive_read_set_seek_callback(ar->archive, ar_seek);
      archive_read_set_close_callback(ar->archive, ar_close);
-     
+
      if ( archive_read_open1(ar->archive) == ARCHIVE_OK )
      { ar->status = AR_OPENED;
        return TRUE;
@@ -878,7 +883,7 @@ archive_open_stream(term_t data, term_t mode, term_t handle, term_t options)
     archive_write_set_open_callback(ar->archive, ar_open);
     archive_write_set_write_callback(ar->archive, ar_write);
     archive_write_set_close_callback(ar->archive, ar_close);
-    
+
     if ( archive_write_open1(ar->archive) == ARCHIVE_OK )
     { ar->status = AR_OPENED;
       return TRUE;
@@ -1091,7 +1096,7 @@ static foreign_t
 archive_set_header_property(term_t archive, term_t field)
 { archive_wrapper *ar;
   functor_t prop;
-  
+
   if ( !get_archive(archive, &ar) )
     return FALSE;
 
@@ -1144,7 +1149,7 @@ archive_set_header_property(term_t archive, term_t field)
     _PL_get_arg(1, field, arg);
     if ( !PL_get_atom(arg, &atom) )
       return PL_type_error("atom", arg);
-    link = PL_atom_wchars(atom, &len);           
+    link = PL_atom_wchars(atom, &len);
     archive_entry_copy_symlink_w(ar->entry, link);
     archive_entry_set_filetype(ar->entry, AE_IFLNK);
     PL_succeed;
