@@ -160,7 +160,7 @@ static atom_t ATOM_cab;
 static atom_t ATOM_cpio;
 static atom_t ATOM_empty;
 static atom_t ATOM_gnutar;
-static atom_t ATOM_iso9960;
+static atom_t ATOM_iso9660;
 static atom_t ATOM_lha;
 static atom_t ATOM_mtree;
 static atom_t ATOM_rar;
@@ -476,7 +476,7 @@ archive_error(archive_wrapper *ar)
 #define FORMAT_GNUTAR	  0x00200000
 #endif
 #ifdef HAVE_ARCHIVE_READ_SUPPORT_FORMAT_ISO9660
-#define FORMAT_ISO9960	  0x00400000
+#define FORMAT_ISO9660	  0x00400000
 #endif
 #ifdef HAVE_ARCHIVE_READ_SUPPORT_FORMAT_LHA
 #define FORMAT_LHA	  0x00800000
@@ -656,9 +656,9 @@ archive_open_stream(term_t data, term_t mode, term_t handle, term_t options)
       else if ( f == ATOM_gnutar )
 	ar->type |= FORMAT_GNUTAR;
 #endif
-#ifdef FORMAT_ISO9960
-      else if ( f == ATOM_iso9960 )
-	ar->type |= FORMAT_ISO9960;
+#ifdef FORMAT_ISO9660
+      else if ( f == ATOM_iso9660 )
+	ar->type |= FORMAT_ISO9660;
 #endif
 #ifdef FORMAT_LHA
       else if ( f == ATOM_lha )
@@ -775,8 +775,8 @@ archive_open_stream(term_t data, term_t mode, term_t handle, term_t options)
 #ifdef FORMAT_GNUTAR
        enable_type(ar, FORMAT_GNUTAR,  archive_read_support_format_gnutar);
 #endif
-#ifdef FORMAT_ISO9960
-       enable_type(ar, FORMAT_ISO9960, archive_read_support_format_iso9660);
+#ifdef FORMAT_ISO9660
+       enable_type(ar, FORMAT_ISO9660, archive_read_support_format_iso9660);
 #endif
 #ifdef FORMAT_LHA
        enable_type(ar, FORMAT_LHA,     archive_read_support_format_lha);
@@ -1320,7 +1320,7 @@ install_archive4pl(void)
   MKATOM(cpio);
   MKATOM(empty);
   MKATOM(gnutar);
-  MKATOM(iso9960);
+  MKATOM(iso9660);
   MKATOM(lha);
   MKATOM(mtree);
   MKATOM(rar);
