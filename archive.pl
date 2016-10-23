@@ -268,6 +268,7 @@ header_property(mtime(_)).
 header_property(size(_)).
 header_property(link_target(_)).
 header_property(format(_)).
+header_property(permissions(_)).
 
 
 %%	archive_extract(+ArchiveFile, +Dir, +Options)
@@ -297,7 +298,8 @@ archive_extract(Archive, Dir, Options) :-
 extract(Archive, Dir, Options) :-
 	archive_next_header(Archive, Path), !,
 	(   archive_header_property(Archive, filetype(file))
-	->  (   option(remove_prefix(Remove), Options)
+	->  archive_header_property(Archive, permissions(Perm)),
+	    (   option(remove_prefix(Remove), Options)
 	    ->	(   atom_concat(Remove, ExtractPath, Path)
 		->  true
 		;   domain_error(path_prefix(Remove), Path)
@@ -313,11 +315,22 @@ extract(Archive, Dir, Options) :-
 		    open(Target, write, Out, [type(binary)]),
 		    copy_stream_data(In, Out),
 		    close(Out)),
-		close(In))
+		close(In)),
+	    set_permissions(Perm, Target)
 	;   true
 	),
 	extract(Archive, Dir, Options).
 extract(_, _, _).
+
+%%	set_permissions(+Perm:integer, +Target:atom)
+%
+%	Restore the permissions.  Currently only restores the executable
+%	permission.
+
+set_permissions(Perm, Target) :-
+	Perm /\ 0o700 =\= 0, !,
+	'$mark_executable'(Target).
+set_permissions(_, _).
 
 
 		 /*******************************
