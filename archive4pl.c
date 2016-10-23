@@ -186,7 +186,7 @@ static functor_t FUNCTOR_format1;
 static functor_t FUNCTOR_mtime1;
 static functor_t FUNCTOR_size1;
 static functor_t FUNCTOR_link_target1;
-
+static functor_t FUNCTOR_permissions1;
 
 static
 int PL_existence_error3(const char* type, const char* object, term_t in)
@@ -1071,6 +1071,12 @@ archive_header_prop(term_t archive, term_t field)
     }
 
     return FALSE;
+  } else if ( prop == FUNCTOR_permissions1 )
+  { __LA_MODE_T perm = archive_entry_perm(ar->entry);
+    term_t arg = PL_new_term_ref();
+    _PL_get_arg(1, field, arg);
+
+    return PL_unify_integer(arg, perm);
   } else if ( prop == FUNCTOR_format1 )
   { const char *s = archive_format_name(ar->archive);
 
@@ -1346,6 +1352,7 @@ install_archive4pl(void)
   MKFUNCTOR(size,            1);
   MKFUNCTOR(link_target,     1);
   MKFUNCTOR(format,          1);
+  MKFUNCTOR(permissions,     1);
 
   PL_register_foreign("archive_open_stream",  4, archive_open_stream, 0);
   PL_register_foreign("archive_property",     3, archive_property,    0);

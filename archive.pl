@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker and Matt Lilley
     E-mail:        J.Wielemaker@cs.vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2012-2015, VU University Amsterdam
+    Copyright (c)  2012-2016, VU University Amsterdam
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -253,6 +253,8 @@ defined_archive_property(filter(_)).
 %	  Provides the name of the archive format applicable to the
 %	  current entry.  The returned value is the lowercase version
 %	  of the output of archive_format_name().
+%	  * permissions(-Integer)
+%	  True when entry has the indicated permission mask.
 
 archive_header_property(Archive, Property) :-
 	(   nonvar(Property)
