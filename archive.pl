@@ -331,7 +331,7 @@ extract(_, _, _).
 %   permission.
 
 set_permissions(Perm, Target) :-
-    Perm /\ 0o700 =\= 0,
+    Perm /\ 0o100 =\= 0,
     !,
     '$mark_executable'(Target).
 set_permissions(_, _).
