@@ -380,9 +380,9 @@ contents(_, []).
 %       - name(Atom)
 %       Name of the entry.
 %
-%   Note that this predicate can  handle   a  non-archive files as a
-%   pseudo archive holding a single   stream by using archive_open/3
-%   with the options `[format(all), format(raw)]`.
+%   Non-archive files are handled as pseudo-archives that hold a
+%   single stream.  This is implemented by using archive_open/3 with
+%   the options `[format(all),format(raw)]`.
 
 archive_data_stream(Archive, DataStream, Options) :-
     option(meta_data(MetaData), Options, _),
