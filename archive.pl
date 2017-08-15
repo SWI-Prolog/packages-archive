@@ -280,6 +280,9 @@ header_property(permissions(_)).
 %
 %     * remove_prefix(+Prefix)
 %     Strip Prefix from all entries before extracting
+%     * exclude(+ListOfPatterns)
+%     Ignore members that match one of the given patterns.
+%     Patterns are handed to wildcard_match/2.
 %
 %   @error  existence_error(directory, Dir) if Dir does not exist
 %           or is not a directory.
@@ -300,7 +303,8 @@ archive_extract(Archive, Dir, Options) :-
 extract(Archive, Dir, Options) :-
     archive_next_header(Archive, Path),
     !,
-    (   archive_header_property(Archive, filetype(file))
+    (   archive_header_property(Archive, filetype(file)),
+        \+ excluded(Path, Options)
     ->  archive_header_property(Archive, permissions(Perm)),
         (   option(remove_prefix(Remove), Options)
         ->  (   atom_concat(Remove, ExtractPath, Path)
@@ -324,6 +328,15 @@ extract(Archive, Dir, Options) :-
     ),
     extract(Archive, Dir, Options).
 extract(_, _, _).
+
+excluded(Path, Options) :-
+    option(exclude(Patterns), Options),
+    split_string(Path, "/", "/", Parts),
+    member(Segment, Parts),
+    Segment \== "",
+    member(Pattern, Patterns),
+    wildcard_match(Pattern, Segment).
+
 
 %!  set_permissions(+Perm:integer, +Target:atom)
 %
