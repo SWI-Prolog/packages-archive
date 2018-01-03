@@ -73,6 +73,10 @@ The following example lists the entries in an archive:
 
 :- use_foreign_library(foreign(archive4pl)).
 
+%!  archive_open(+Data, -Archive, +Options) is det.
+%
+%   Wrapper around archive_open/4 that opens the archive in read mode.
+
 archive_open(Stream, Archive, Options) :-
     archive_open(Stream, read, Archive, Options).
 
