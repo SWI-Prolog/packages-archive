@@ -637,11 +637,11 @@ archive_open_stream(term_t data, term_t mode, term_t handle, term_t options)
 	ar->type |= FORMAT_7ZIP;
 #endif
 #ifdef FORMAT_AR
-      else if ( f == ATOM_ar )
+      else if ( how == 'r' && f == ATOM_ar )
 	ar->type |= FORMAT_AR;
 #endif
 #ifdef FORMAT_CAB
-      else if ( f == ATOM_cab )
+      else if ( how == 'r' && f == ATOM_cab )
 	ar->type |= FORMAT_CAB;
 #endif
 #ifdef FORMAT_CPIO
@@ -649,7 +649,7 @@ archive_open_stream(term_t data, term_t mode, term_t handle, term_t options)
 	ar->type |= FORMAT_CPIO;
 #endif
 #ifdef FORMAT_EMPTY
-      else if ( f == ATOM_empty )
+      else if ( how == 'r' && f == ATOM_empty )
 	ar->type |= FORMAT_EMPTY;
 #endif
 #ifdef FORMAT_GNUTAR
@@ -661,23 +661,23 @@ archive_open_stream(term_t data, term_t mode, term_t handle, term_t options)
 	ar->type |= FORMAT_ISO9660;
 #endif
 #ifdef FORMAT_LHA
-      else if ( f == ATOM_lha )
+      else if ( how == 'r' && f == ATOM_lha )
 	ar->type |= FORMAT_LHA;
 #endif
 #ifdef FORMAT_MTREE
-      else if ( f == ATOM_mtree )
+      else if ( how == 'r' && f == ATOM_mtree )
 	ar->type |= FORMAT_MTREE;
 #endif
 #ifdef FORMAT_RAR
-      else if ( f == ATOM_rar )
+      else if ( how == 'r' && f == ATOM_rar )
 	ar->type |= FORMAT_RAR;
 #endif
 #ifdef FORMAT_RAW
-      else if ( f == ATOM_raw )
+      else if ( how == 'r' && f == ATOM_raw )
 	ar->type |= FORMAT_RAW;
 #endif
 #ifdef FORMAT_TAR
-      else if ( f == ATOM_tar )
+      else if ( how == 'r' && f == ATOM_tar )
 	ar->type |= FORMAT_TAR;
 #endif
 #ifdef FORMAT_XAR
@@ -689,7 +689,10 @@ archive_open_stream(term_t data, term_t mode, term_t handle, term_t options)
 	ar->type |= FORMAT_ZIP;
 #endif
       else
-	return PL_domain_error("format", arg);
+	if ( how == 'r' )
+          return PL_domain_error("read_format", arg);
+	else
+          return PL_domain_error("write_format", arg);
     } else if ( name == ATOM_close_parent )
     { if ( !PL_get_bool_ex(arg, &ar->close_parent) )
 	return FALSE;

@@ -121,16 +121,23 @@ archive_open(Stream, Archive, Options) :-
 %     and =xz=. The value =all= is default for read, =none= for write.
 %
 %     * format(+Format)
-%     Support the indicated format.  This option may be used
-%     multiple times to support multiple formats in read mode.
-%     In write mode, you must supply a single format. If no format
-%     options are provided, =all= is assumed for read mode. Note that
-%     =all= does *not* include =raw=. To open both archive
-%     and non-archive files, _both_ format(all) and
-%     format(raw) must be specified. Supported values are: =all=,
-%     =7zip=, =ar=, =cab=, =cpio=, =empty=, =gnutar=, =iso9660=,
-%     =lha=, =mtree=, =rar=, =raw=, =tar=, =xar= and =zip=. The
-%     value =all= is default for read.
+%     Support the indicated format. This  option   may  be used multiple
+%     times to support multiple formats in read mode. In write mode, you
+%     must supply a single format. If   no  format options are provided,
+%     =all= is assumed for read mode. Note that =all= does *not* include
+%     =raw=.  To  open  both  archive   and  non-archive  files,  _both_
+%     format(all) and format(raw) must be specified.
+%
+%     In read mode, the following values   are supported: =all=, =7zip=,
+%     =ar=, =cab=, =cpio=, =empty=, =gnutar=, =iso9660=, =lha=, =mtree=,
+%     =rar=, =raw=, =tar=, =xar= and =zip=.   The value =all= is default
+%     for read.
+%
+%     In write mode the following formats are supported: =7zip=, =cpio=,
+%     =gnutar=, =iso9660=, =xar= and =zip=.
+%
+%     Note that a particular installation may   support only a subset of
+%     these, depending on the configuration of =libarchive=.
 %
 %   Note that the actually supported   compression types and formats
 %   may vary depending on the version   and  installation options of
@@ -402,10 +409,11 @@ contents(_, []).
 %   the options `[format(all),format(raw)]`.
 
 archive_data_stream(Archive, DataStream, Options) :-
-    option(meta_data(MetaData), Options, _),
-    archive_content(Archive, DataStream, MetaData, []).
+    select_option(meta_data(MetaData), Options, RestOptions, _),
+    merge_options([close_parent(true)], RestOptions, SubstreamOptions),
+    archive_content(Archive, DataStream, MetaData, [], SubstreamOptions).
 
-archive_content(Archive, Entry, [EntryMetadata|PipeMetadataTail], PipeMetadata2) :-
+archive_content(Archive, Entry, [EntryMetadata|PipeMetadataTail], PipeMetadata2, Options) :-
     archive_property(Archive, filter(Filters)),
     repeat,
     (   archive_next_header(Archive, EntryName)
@@ -432,7 +440,8 @@ archive_content(Archive, Entry, [EntryMetadata|PipeMetadataTail], PipeMetadata2)
                 open_substream(Entry0,
                                Entry,
                                PipeMetadata1,
-                               PipeMetadata2)
+                               PipeMetadata2,
+                               Options)
             )
         ;   fail
         )
@@ -440,15 +449,10 @@ archive_content(Archive, Entry, [EntryMetadata|PipeMetadataTail], PipeMetadata2)
         fail
     ).
 
-open_substream(In, Entry, ArchiveMetadata, PipeTailMetadata) :-
+open_substream(In, Entry, ArchiveMetadata, PipeTailMetadata, Options) :-
     setup_call_cleanup(
-        archive_open(stream(In),
-                     Archive,
-                     [ close_parent(true),
-                       format(all),
-                       format(raw)
-                     ]),
-        archive_content(Archive, Entry, ArchiveMetadata, PipeTailMetadata),
+        archive_open(stream(In), Archive, Options),
+        archive_content(Archive, Entry, ArchiveMetadata, PipeTailMetadata, Options),
         archive_close(Archive)).
 
 
