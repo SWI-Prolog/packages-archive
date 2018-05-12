@@ -470,12 +470,6 @@ open_substream(In, Entry, ArchiveMetadata, PipeTailMetadata, Options) :-
 %     Directory and archived files will not have Directory
 %     as leading path. This is to simulate =|-C|= option of
 %     the =tar= program.
-%
-%     * format(+Format)
-%     Write mode supports the following formats: `7zip`, `cpio`,
-%     `gnutar`, `iso9660`, `xar` and `zip`.  Note that a particular
-%     installation may support only a subset of these, depending on
-%     the configuration of `libarchive`.
 
 archive_create(OutputFile, InputFiles, Options) :-
     must_be(list(text), InputFiles),
