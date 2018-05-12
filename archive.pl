@@ -402,10 +402,11 @@ contents(_, []).
 %   the options `[format(all),format(raw)]`.
 
 archive_data_stream(Archive, DataStream, Options) :-
-    option(meta_data(MetaData), Options, _),
-    archive_content(Archive, DataStream, MetaData, []).
+    select_option(meta_data(MetaData), Options, RestOptions, _),
+    merge_options([close_parent(true)], RestOptions, SubstreamOptions),
+    archive_content(Archive, DataStream, MetaData, [], SubstreamOptions).
 
-archive_content(Archive, Entry, [EntryMetadata|PipeMetadataTail], PipeMetadata2) :-
+archive_content(Archive, Entry, [EntryMetadata|PipeMetadataTail], PipeMetadata2, Options) :-
     archive_property(Archive, filter(Filters)),
     repeat,
     (   archive_next_header(Archive, EntryName)
@@ -432,7 +433,8 @@ archive_content(Archive, Entry, [EntryMetadata|PipeMetadataTail], PipeMetadata2)
                 open_substream(Entry0,
                                Entry,
                                PipeMetadata1,
-                               PipeMetadata2)
+                               PipeMetadata2,
+                               Options)
             )
         ;   fail
         )
@@ -440,15 +442,10 @@ archive_content(Archive, Entry, [EntryMetadata|PipeMetadataTail], PipeMetadata2)
         fail
     ).
 
-open_substream(In, Entry, ArchiveMetadata, PipeTailMetadata) :-
+open_substream(In, Entry, ArchiveMetadata, PipeTailMetadata, Options) :-
     setup_call_cleanup(
-        archive_open(stream(In),
-                     Archive,
-                     [ close_parent(true),
-                       format(all),
-                       format(raw)
-                     ]),
-        archive_content(Archive, Entry, ArchiveMetadata, PipeTailMetadata),
+        archive_open(stream(In), Archive, Options),
+        archive_content(Archive, Entry, ArchiveMetadata, PipeTailMetadata, Options),
         archive_close(Archive)).
 
 
