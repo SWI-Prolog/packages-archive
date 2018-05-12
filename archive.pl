@@ -121,16 +121,23 @@ archive_open(Stream, Archive, Options) :-
 %     and =xz=. The value =all= is default for read, =none= for write.
 %
 %     * format(+Format)
-%     Support the indicated format.  This option may be used
-%     multiple times to support multiple formats in read mode.
-%     In write mode, you must supply a single format. If no format
-%     options are provided, =all= is assumed for read mode. Note that
-%     =all= does *not* include =raw=. To open both archive
-%     and non-archive files, _both_ format(all) and
-%     format(raw) must be specified. Supported values are: =all=,
-%     =7zip=, =ar=, =cab=, =cpio=, =empty=, =gnutar=, =iso9660=,
-%     =lha=, =mtree=, =rar=, =raw=, =tar=, =xar= and =zip=. The
-%     value =all= is default for read.
+%     Support the indicated format. This  option   may  be used multiple
+%     times to support multiple formats in read mode. In write mode, you
+%     must supply a single format. If   no  format options are provided,
+%     =all= is assumed for read mode. Note that =all= does *not* include
+%     =raw=.  To  open  both  archive   and  non-archive  files,  _both_
+%     format(all) and format(raw) must be specified.
+%
+%     In read mode, the following values   are supported: =all=, =7zip=,
+%     =ar=, =cab=, =cpio=, =empty=, =gnutar=, =iso9660=, =lha=, =mtree=,
+%     =rar=, =raw=, =tar=, =xar= and =zip=.   The value =all= is default
+%     for read.
+%
+%     In write mode the following formats are supported: =7zip=, =cpio=,
+%     =gnutar=, =iso9660=, =xar= and =zip=.
+%
+%     Note that a particular installation may   support only a subset of
+%     these, depending on the configuration of =libarchive=.
 %
 %   Note that the actually supported   compression types and formats
 %   may vary depending on the version   and  installation options of
