@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker and Matt Lilley
     E-mail:        J.Wielemaker@cs.vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2012-2016, VU University Amsterdam
+    Copyright (c)  2012-2018, VU University Amsterdam
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -125,12 +125,12 @@ archive_open(Stream, Archive, Options) :-
 %     multiple times to support multiple formats in read mode.
 %     In write mode, you must supply a single format. If no format
 %     options are provided, =all= is assumed for read mode. Note that
-%     =all= does *not* include =raw=. To open both archive
+%     =all= does *not* include =raw= and =mtree=. To open both archive
 %     and non-archive files, _both_ format(all) and
-%     format(raw) must be specified. Supported values are: =all=,
-%     =7zip=, =ar=, =cab=, =cpio=, =empty=, =gnutar=, =iso9660=,
-%     =lha=, =mtree=, =rar=, =raw=, =tar=, =xar= and =zip=. The
-%     value =all= is default for read.
+%     format(raw) and/or format(mtree) must be specified. Supported
+%     values are: =all=, =7zip=, =ar=, =cab=, =cpio=, =empty=, =gnutar=,
+%     =iso9660=, =lha=, =mtree=, =rar=, =raw=, =tar=, =xar= and =zip=.
+%     The value =all= is default for read.
 %
 %   Note that the actually supported   compression types and formats
 %   may vary depending on the version   and  installation options of

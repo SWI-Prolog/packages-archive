@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2012-2015, VU University Amsterdam
+    Copyright (c)  2012-2018, VU University Amsterdam
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -501,7 +501,7 @@ archive_error(archive_wrapper *ar)
 #endif
 
 #define FORMAT_MASK	  0xffff0000
-#define FORMAT_ALL	  (FORMAT_MASK&~FORMAT_RAW)
+#define FORMAT_ALL	  (FORMAT_MASK&~(FORMAT_RAW|FORMAT_MTREE))
 
 static void
 enable_type(archive_wrapper *ar, int type,
