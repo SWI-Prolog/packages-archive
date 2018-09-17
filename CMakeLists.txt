@@ -54,5 +54,8 @@ swipl_plugin(
     C_SOURCES archive4pl.c
     C_LIBS ${LibArchive_LIBRARIES}
     PL_LIBS archive.pl)
+target_include_directories(
+    plugin_archive4pl BEFORE PRIVATE
+    ${LibArchive_INCLUDE_DIRS})
 
 endif(LibArchive_FOUND)
