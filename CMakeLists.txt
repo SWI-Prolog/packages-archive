@@ -58,4 +58,6 @@ target_include_directories(
     plugin_archive4pl BEFORE PRIVATE
     ${LibArchive_INCLUDE_DIRS})
 
+install_dll(${LibArchive_LIBRARIES})
+
 endif(LibArchive_FOUND)
