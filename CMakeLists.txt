@@ -50,7 +50,8 @@ AC_CHECK_FUNCS(archive_read_free
 configure_file(config.h.cmake config.h)
 
 swipl_plugin(
-    archive4pl
+    archive
+    MODULE archive4pl
     C_SOURCES archive4pl.c
     C_LIBS ${LibArchive_LIBRARIES}
     PL_LIBS archive.pl)
