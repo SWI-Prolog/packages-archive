@@ -3,7 +3,9 @@ project(swipl-archive)
 
 include("../cmake/PrologPackage.cmake")
 
-cmake_policy(SET CMP0074 NEW)
+if(POLICY CMP0074)
+  cmake_policy(SET CMP0074 NEW)
+endif()
 find_package(LibArchive)
 if(LibArchive_FOUND)
 set(CMAKE_REQUIRED_LIBRARIES ${CMAKE_REQUIRED_LIBRARIES} ${LibArchive_LIBRARIES})
