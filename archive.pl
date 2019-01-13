@@ -287,6 +287,11 @@ header_property(permissions(_)).
 %     * exclude(+ListOfPatterns)
 %     Ignore members that match one of the given patterns.
 %     Patterns are handed to wildcard_match/2.
+%     * include(+ListOfPatterns)
+%     Include members that match one of the given patterns.
+%     Patterns are handed to wildcard_match/2. The `exclude`
+%     options takes preference if a member matches both the `include`
+%     and the `exclude` option.
 %
 %   @error  existence_error(directory, Dir) if Dir does not exist
 %           or is not a directory.
@@ -307,8 +312,11 @@ archive_extract(Archive, Dir, Options) :-
 extract(Archive, Dir, Options) :-
     archive_next_header(Archive, Path),
     !,
+    option(include(InclPatterns), Options, ['*']), % Default: include all
+    option(exclude(ExclPatterns), Options, -1),  % Default: don't exclude any
     (   archive_header_property(Archive, filetype(file)),
-        \+ excluded(Path, Options)
+        \+ matches(ExclPatterns, Path),
+        matches(InclPatterns, Path)
     ->  archive_header_property(Archive, permissions(Perm)),
         (   option(remove_prefix(Remove), Options)
         ->  (   atom_concat(Remove, ExtractPath, Path)
@@ -333,8 +341,11 @@ extract(Archive, Dir, Options) :-
     extract(Archive, Dir, Options).
 extract(_, _, _).
 
-excluded(Path, Options) :-
-    option(exclude(Patterns), Options),
+matches(-1, _Path) :-
+   % The non-existent pattern -1 (an integer) means
+   % don't exclude any file, it is only used internally.
+   fail.
+matches(Patterns, Path) :-
     split_string(Path, "/", "/", Parts),
     member(Segment, Parts),
     Segment \== "",
