@@ -48,6 +48,7 @@
             archive_data_stream/3       % +Archive, -DataStream, +Options
           ]).
 :- use_module(library(error)).
+:- use_module(library(lists)).
 :- use_module(library(option)).
 :- use_module(library(filesex)).
 
@@ -283,10 +284,18 @@ header_property(permissions(_)).
 %   options:
 %
 %     * remove_prefix(+Prefix)
-%     Strip Prefix from all entries before extracting
+%     Strip Prefix from all entries before extracting. If Prefix
+%     is a list, then each prefix is tried in order, succeding at
+%     the first one that matches. If no prefixes match, an error
+%     is reported. If Prefix is an atom, then that prefix is removed.
 %     * exclude(+ListOfPatterns)
 %     Ignore members that match one of the given patterns.
 %     Patterns are handed to wildcard_match/2.
+%     * include(+ListOfPatterns)
+%     Include members that match one of the given patterns.
+%     Patterns are handed to wildcard_match/2. The `exclude`
+%     options takes preference if a member matches both the `include`
+%     and the `exclude` option.
 %
 %   @error  existence_error(directory, Dir) if Dir does not exist
 %           or is not a directory.
@@ -307,16 +316,13 @@ archive_extract(Archive, Dir, Options) :-
 extract(Archive, Dir, Options) :-
     archive_next_header(Archive, Path),
     !,
+    option(include(InclPatterns), Options, ['*']),
+    option(exclude(ExclPatterns), Options, []),
     (   archive_header_property(Archive, filetype(file)),
-        \+ excluded(Path, Options)
+        \+ matches(ExclPatterns, Path),
+        matches(InclPatterns, Path)
     ->  archive_header_property(Archive, permissions(Perm)),
-        (   option(remove_prefix(Remove), Options)
-        ->  (   atom_concat(Remove, ExtractPath, Path)
-            ->  true
-            ;   domain_error(path_prefix(Remove), Path)
-            )
-        ;   ExtractPath = Path
-        ),
+        remove_prefix(Options, Path, ExtractPath),
         directory_file_path(Dir, ExtractPath, Target),
         file_directory_name(Target, FileDir),
         make_directory_path(FileDir),
@@ -333,14 +339,36 @@ extract(Archive, Dir, Options) :-
     extract(Archive, Dir, Options).
 extract(_, _, _).
 
-excluded(Path, Options) :-
-    option(exclude(Patterns), Options),
+%!  matches(+Patterns, +Path) is semidet.
+%
+%   True when Path matches a pattern in Patterns.
+
+matches([], _Path) :-
+    !,
+    fail.
+matches(Patterns, Path) :-
     split_string(Path, "/", "/", Parts),
     member(Segment, Parts),
     Segment \== "",
     member(Pattern, Patterns),
-    wildcard_match(Pattern, Segment).
+    wildcard_match(Pattern, Segment),
+    !.
 
+remove_prefix(Options, Path, ExtractPath) :-
+    (   option(remove_prefix(Remove), Options)
+    ->  (   is_list(Remove)
+        ->  (   member(P, Remove),
+                atom_concat(P, ExtractPath, Path)
+            ->  true
+            ;   domain_error(path_prefix(Remove), Path)
+            )
+        ;   (   atom_concat(Remove, ExtractPath, Path)
+            ->  true
+            ;   domain_error(path_prefix(Remove), Path)
+            )
+        )
+    ;   ExtractPath = Path
+    ).
 
 %!  set_permissions(+Perm:integer, +Target:atom)
 %
