@@ -283,7 +283,10 @@ header_property(permissions(_)).
 %   options:
 %
 %     * remove_prefix(+Prefix)
-%     Strip Prefix from all entries before extracting
+%     Strip Prefix from all entries before extracting. If `Prefix`
+%     is a list, then each prefix is tried in order, succeding at
+%     the first one that matches. If no prefixes match, an error
+%     is reported. If `Prefix` is an atom, then that prefix is removed.
 %     * exclude(+ListOfPatterns)
 %     Ignore members that match one of the given patterns.
 %     Patterns are handed to wildcard_match/2.
@@ -318,13 +321,7 @@ extract(Archive, Dir, Options) :-
         \+ matches(ExclPatterns, Path),
         matches(InclPatterns, Path)
     ->  archive_header_property(Archive, permissions(Perm)),
-        (   option(remove_prefix(Remove), Options)
-        ->  (   atom_concat(Remove, ExtractPath, Path)
-            ->  true
-            ;   domain_error(path_prefix(Remove), Path)
-            )
-        ;   ExtractPath = Path
-        ),
+        remove_prefix(Options, Path, ExtractPath),
         directory_file_path(Dir, ExtractPath, Target),
         file_directory_name(Target, FileDir),
         make_directory_path(FileDir),
@@ -352,6 +349,18 @@ matches(Patterns, Path) :-
     member(Pattern, Patterns),
     wildcard_match(Pattern, Segment).
 
+remove_prefix(Options, Path, ExtractPath) :-
+    option(remove_prefix(P), Options),
+    atom(P),
+    atom_concat(P, ExtractPath, Path).
+remove_prefix(Options, Path, ExtractPath) :-
+    option(remove_prefix(Ps), Options),
+    is_list(Ps),
+    member(P,Ps),
+    atom_concat(P, ExtractPath, Path).
+remove_prefix(Options, Path, _ExtractPath) :-
+    option(remove_prefix(Ps), Options),
+    domain_error(path_prefix(Ps), Path).
 
 %!  set_permissions(+Perm:integer, +Target:atom)
 %
