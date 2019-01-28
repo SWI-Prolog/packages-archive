@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker and Matt Lilley
     E-mail:        J.Wielemaker@cs.vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2012-2018, VU University Amsterdam
+    Copyright (c)  2012-2019, VU University Amsterdam
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -45,19 +45,23 @@
             archive_extract/3,          % +Archive, +Dir, +Options
 
             archive_entries/2,          % +Archive, -Entries
-            archive_data_stream/3       % +Archive, -DataStream, +Options
+            archive_data_stream/3,      % +Archive, -DataStream, +Options
+            archive_foldl/4             % :Goal, +Archive, +State0, -State
           ]).
 :- use_module(library(error)).
 :- use_module(library(lists)).
 :- use_module(library(option)).
 :- use_module(library(filesex)).
 
+:- meta_predicate
+    archive_foldl(4, +, +, -).
+
 /** <module> Access several archive formats
 
 This library uses _libarchive_ to access   a variety of archive formats.
 The following example lists the entries in an archive:
 
-  ==
+  ```
   list_archive(File) :-
         archive_open(File, Archive, []),
         repeat,
@@ -67,9 +71,24 @@ The following example lists the entries in an archive:
            ;   !,
                archive_close(Archive)
            ).
-  ==
+  ```
 
-@see http://code.google.com/p/libarchive/
+Here is another example which counts the files in the archive and prints
+file  type  information.  It  uses    archive_foldl/4,  a  higher  level
+predicate:
+
+  ```
+  print_entry(Path, Handle, Cnt0, Cnt1) :-
+      archive_header_property(Handle, filetype(Type)),
+      format('File ~w is of type ~w~n', [Path, Type]),
+      Cnt1 is Cnt0 + 1.
+
+  list_archive(File) :-
+      archive_foldl(print_entry, File, 0, FileCount),
+      format('We have ~w files', [FileCount]).
+  ```
+
+@see https://github.com/libarchive/libarchive/
 */
 
 :- use_foreign_library(foreign(archive4pl)).
@@ -551,3 +570,29 @@ archive_create_2(Archive, Base, Filename) :-
 entry_name('.', Name, Name) :- !.
 entry_name(Base, Name, EntryName) :-
     directory_file_path(Base, EntryName, Name).
+
+%!  archive_foldl(:Goal, +Archive, +State0, -State).
+%
+%   Operates like foldl/4 but for the entries   in the archive. For each
+%   member of the archive, Goal called   as `call(:Goal, +Path, +Handle,
+%   +S0,  -S1).  Here,  `S0`  is  current  state  of  the  _accumulator_
+%   (starting  with  State0)  and  `S1`  is    the  next  state  of  the
+%   accumulator, producing State after the last member of the archive.
+%
+%   @see archive_header_property/2, archive_open/4.
+%
+%   @arg Archive File name or stream to be given to archive_open/[3,4].
+
+archive_foldl(Goal, Archive, State0, State) :-
+    setup_call_cleanup(
+        archive_open(Archive, Handle, [close_parent(true)]),
+        archive_foldl_(Goal, Handle, State0, State),
+        archive_close(Handle)
+    ).
+
+archive_foldl_(Goal, Handle, State0, State) :-
+    (   archive_next_header(Handle, Path)
+    ->  call(Goal, Path, Handle, State0, State1),
+        archive_foldl_(Goal, Handle, State1, State)
+    ;   State = State0
+    ).
