@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker and Matt Lilley
     E-mail:        J.Wielemaker@cs.vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2012-2018, VU University Amsterdam
+    Copyright (c)  2012-2019, VU University Amsterdam
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -45,12 +45,16 @@
             archive_extract/3,          % +Archive, +Dir, +Options
 
             archive_entries/2,          % +Archive, -Entries
-            archive_data_stream/3       % +Archive, -DataStream, +Options
+            archive_data_stream/3,      % +Archive, -DataStream, +Options
+            archive_foldl/4             % :Goal, +Archive, +State0, -State
           ]).
 :- use_module(library(error)).
 :- use_module(library(lists)).
 :- use_module(library(option)).
 :- use_module(library(filesex)).
+
+:- meta_predicate
+    archive_foldl(4, +, +, -).
 
 /** <module> Access several archive formats
 
@@ -69,7 +73,22 @@ The following example lists the entries in an archive:
            ).
   ==
 
-@see http://code.google.com/p/libarchive/
+  Here is another example which counts the files in the archive
+  and prints file type information. It uses archive_foldl/4, a
+  higher level predicate:
+
+  ==
+  print_entry(Path, Handle, Cnt0, Cnt1) :-
+      archive_header_property(Handle, filetype(Type)),
+      format('File ~w is of type ~w~n', [Path, Type]),
+      Cnt1 is Cnt0 + 1.
+
+  list_archive(File) :-
+      archive_foldl(print_entry, File, 0, FileCount),
+      format('We have ~w files',[FileCount]).
+  ==
+
+@see https://github.com/libarchive/libarchive/
 */
 
 :- use_foreign_library(foreign(archive4pl)).
@@ -551,3 +570,48 @@ archive_create_2(Archive, Base, Filename) :-
 entry_name('.', Name, Name) :- !.
 entry_name(Base, Name, EntryName) :-
     directory_file_path(Base, EntryName, Name).
+
+%!  archive_foldl(:Goal, +Archive, +State0, -State).
+%
+%   Operates like foldl/4 but for the entries in the archive.
+%
+%   Goal is of the form `Goal(+Path, +Handle, +S0, -S).
+%   `S0` is unified with the initial accumulator (State0) on the
+%   first call. On successive calls it is unified with the value
+%   of the previous call, and on the final call `State` is
+%   unified with `S`, just like any accumulator.
+%
+%   `Handle` is the handle to the archive.
+%
+%   The archive is closed even if the Goal fails or throws an
+%   exception.
+%
+%   @see archive_header_property/2, archive_open/4.
+%
+%   @param Goal      called as `Goal(+Path, +Handle, +S0, -S)`
+%   for each entry in the archive.
+%
+%   @param Archive   Archive name or stream to be given to
+%   archive_open/[3,4].
+%
+%   @param State0 initial value of the accumulator, passed to `Goal`.
+%
+%   @param State final value of the accumulator, returned by `Goal`.
+%
+
+archive_foldl(Goal, Archive, State0, State) :-
+    setup_call_cleanup(
+        archive_open(Archive, Handle, [close_parent(true)]),
+        archive_foldl_(try_an_entry ,Goal, Handle, State0, State),
+        archive_close(Handle)
+    ).
+
+archive_foldl_(archive_end, _, _, S, S).
+archive_foldl_(try_an_entry,  Goal, Handle, State0, State) :-
+    (   archive_next_header(Handle, Path)
+    ->  call(Goal, Path, Handle, State0, State1),
+        EndMarker = try_an_entry
+    ;   EndMarker = archive_end,
+        State1 = State0
+    ),
+    archive_foldl_(EndMarker, Goal, Handle, State1, State).
