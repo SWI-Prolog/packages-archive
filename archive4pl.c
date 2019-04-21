@@ -372,28 +372,35 @@ free_archive(archive_wrapper *ar)
 }
 
 static int
-archive_error(archive_wrapper *ar)
+archive_error(archive_wrapper *ar, int rc)
 { int eno = archive_errno(ar->archive);
+  const char *s = archive_error_string(ar->archive);
+  term_t ex;
 
-  if ( eno != 0 )
-  { const char *s = archive_error_string(ar->archive);
-    term_t ex = PL_new_term_ref();
-
-    if ( PL_unify_term(ex,
-		       PL_FUNCTOR, FUNCTOR_error2,
-		         PL_FUNCTOR, FUNCTOR_archive_error2,
-		           PL_INT, errno,
-		           PL_CHARS, s,
-		         PL_VARIABLE) )
-      return PL_raise_exception(ex);
-
-    return FALSE;
+  if ( eno == 0 )
+    eno = rc;
+  if ( s == NULL )
+  { switch(rc)
+    { case ARCHIVE_EOF:    s = "eof";    break;
+      case ARCHIVE_OK:     s = "ok";     break;
+      case ARCHIVE_RETRY:  s = "retry";  break;
+      case ARCHIVE_WARN:   s = "warn";   break;
+      case ARCHIVE_FAILED: s = "failed"; break;
+      case ARCHIVE_FATAL:  s = "fatal";  break;
+      default:		   s = "unknown";
+    }
   }
 
-  if ( PL_exception(0) )
-    return FALSE;
+  if ( ( (ex = PL_new_term_ref()) &&
+	 PL_unify_term(ex,
+		       PL_FUNCTOR, FUNCTOR_error2,
+			 PL_FUNCTOR, FUNCTOR_archive_error2,
+			   PL_INT, eno,
+			   PL_CHARS, s,
+			 PL_VARIABLE) ) )
+    return PL_raise_exception(ex);
 
-  return TRUE;
+  return FALSE;
 }
 
 
@@ -502,6 +509,7 @@ archive_open_stream(term_t data, term_t mode, term_t handle, term_t options)
   atom_t mname;
   char how = 'r';
   int flags = 0;
+  int rc;
 
   if ( PL_get_atom(mode, &mname) )
   { if ( mname == ATOM_write )
@@ -788,13 +796,14 @@ archive_open_stream(term_t data, term_t mode, term_t handle, term_t options)
      archive_read_set_seek_callback(ar->archive, ar_seek);
      archive_read_set_close_callback(ar->archive, ar_close);
 
-     if ( archive_read_open1(ar->archive) == ARCHIVE_OK )
+     if ( (rc=archive_read_open1(ar->archive)) == ARCHIVE_OK )
      { ar->status = AR_OPENED;
        return TRUE;
      }
 #else
-     if ( archive_read_open2(ar->archive, ar,
-                             ar_open, ar_read, ar_skip, ar_close) == ARCHIVE_OK )
+     if ( (rc=archive_read_open2(
+		  ar->archive, ar,
+		  ar_open, ar_read, ar_skip, ar_close)) == ARCHIVE_OK )
      { ar->status = AR_OPENED;
        return TRUE;
      }
@@ -864,20 +873,20 @@ archive_open_stream(term_t data, term_t mode, term_t handle, term_t options)
     archive_write_set_write_callback(ar->archive, ar_write);
     archive_write_set_close_callback(ar->archive, ar_close);
 
-    if ( archive_write_open1(ar->archive) == ARCHIVE_OK )
+    if ( (rc=archive_write_open1(ar->archive)) == ARCHIVE_OK )
     { ar->status = AR_OPENED;
       return TRUE;
     }
 #else
-    if ( archive_write_open(ar->archive, ar,
-                             ar_open, ar_write, ar_close) == ARCHIVE_OK )
+    if ( (rc=archive_write_open(ar->archive, ar,
+				ar_open, ar_write, ar_close)) == ARCHIVE_OK )
     { ar->status = AR_OPENED;
       return TRUE;
     }
 #endif
   }
 
-  return archive_error(ar);
+  return archive_error(ar, rc);
 }
 
 
@@ -942,9 +951,11 @@ archive_next_header(term_t archive, term_t name)
     return TRUE;
   }
   if ( ar->status == AR_NEW_ENTRY )
-    archive_read_data_skip(ar->archive);
-  if ( ar->status == AR_OPENED_ENTRY )
-    return PL_permission_error("next_header", "archive", archive);
+  { if ( (rc=archive_read_data_skip(ar->archive)) != ARCHIVE_OK )
+      return archive_error(ar, rc);
+  } else if ( ar->status == AR_OPENED_ENTRY )
+  { return PL_permission_error("next_header", "archive", archive);
+  }
 
   while ( (rc=archive_read_next_header(ar->archive, &ar->entry)) == ARCHIVE_OK )
   { if ( PL_unify_wchars(name, PL_ATOM, -1,
@@ -959,7 +970,7 @@ archive_next_header(term_t archive, term_t name)
   if ( rc == ARCHIVE_EOF )
     return FALSE;			/* simply at the end */
 
-  return archive_error(ar);
+  return archive_error(ar, rc);
 }
 
 
@@ -983,7 +994,7 @@ archive_close(term_t archive)
     return TRUE;
   }
 
-  return archive_error(ar);
+  return archive_error(ar, rc);
 }
 
 		 /*******************************
