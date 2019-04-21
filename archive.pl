@@ -596,3 +596,13 @@ archive_foldl_(Goal, Handle, State0, State) :-
         archive_foldl_(Goal, Handle, State1, State)
     ;   State = State0
     ).
+
+
+		 /*******************************
+		 *           MESSAGES		*
+		 *******************************/
+
+:- multifile prolog:error_message//1.
+
+prolog:error_message(archive_error(Code, Message)) -->
+    [ 'Archive error (code ~p): ~w'-[Code, Message] ].
