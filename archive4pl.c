@@ -509,22 +509,20 @@ archive_open_stream(term_t data, term_t mode, term_t handle, term_t options)
   atom_t mname;
   char how = 'r';
   int flags = 0;
-  int rc;
+  int rc = ARCHIVE_OK;				/* silence compiler */
 
-  if ( PL_get_atom(mode, &mname) )
+  if ( PL_get_atom_ex(mode, &mname) )
   { if ( mname == ATOM_write )
     { how = 'w';
       flags = SIO_OUTPUT;
-    }
-    else if ( mname == ATOM_read )
+    } else if ( mname == ATOM_read )
     { how = 'r';
       flags = SIO_INPUT;
-    }
-    else
-    { PL_domain_error("io_mode", mode);
+    } else
+    { return PL_domain_error("io_mode", mode);
     }
   } else
-  { PL_type_error("atom", mode);
+  { return FALSE;
   }
 
   if ( !PL_get_stream(data, &datas, flags) )
