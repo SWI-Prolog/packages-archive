@@ -809,6 +809,9 @@ archive_open_stream(term_t data, term_t mode, term_t handle, term_t options)
   } else if ( how == 'w' )
   { if ( !(ar->archive = archive_write_new()) )
       return PL_resource_error("memory");
+     /* Prevent libarchive from padding the last block to 10240 bytes. Some decompressors,
+       notably Oracle's jar decompressor, fail when presented with this */
+     archive_write_set_bytes_in_last_block(ar->archive, 1);
      if (0) {}
 #ifdef FORMAT_7ZIP
      else if ( ar->type & FORMAT_7ZIP )    archive_write_set_format_7zip(ar->archive);
