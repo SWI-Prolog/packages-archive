@@ -1176,7 +1176,7 @@ ar_write_entry(void *handle, char *buf, size_t size)
      some formats if the file size is not set. It does not set archive_errno(), unfortunately.
      We turn this into an IO error here by returning -1
   */
-  if (written == 0)
+  if (written == 0 && size > 0)
   { errno = ENOSPC;
     return -1;
   }
