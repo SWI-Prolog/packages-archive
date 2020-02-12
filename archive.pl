@@ -48,10 +48,12 @@
             archive_data_stream/3,      % +Archive, -DataStream, +Options
             archive_foldl/4             % :Goal, +Archive, +State0, -State
           ]).
-:- use_module(library(error)).
-:- use_module(library(lists)).
-:- use_module(library(option)).
-:- use_module(library(filesex)).
+:- autoload(library(error),
+	    [existence_error/2,domain_error/2,must_be/2]).
+:- autoload(library(filesex),
+	    [directory_file_path/3,make_directory_path/1]).
+:- autoload(library(lists),[member/2]).
+:- autoload(library(option),[option/3,option/2]).
 
 :- meta_predicate
     archive_foldl(4, +, +, -).
