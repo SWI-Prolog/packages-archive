@@ -65,6 +65,7 @@ target_include_directories(
 install_dll(${LibArchive_LIBRARIES})
 
 pkg_doc(archive
-	SOURCE archive.pl archive4pl.tex)
+	SOURCE archive.pl archive4pl.tex
+	DEPENDS archive)
 
 endif(LibArchive_FOUND)
