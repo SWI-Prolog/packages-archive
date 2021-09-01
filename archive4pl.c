@@ -488,7 +488,12 @@ archive_error(archive_wrapper *ar, int rc)
 #endif
 
 #define FORMAT_MASK	  0xffff0000
+#if defined(FORMAT_RAW) && defined(FORMAT_MTREE)
 #define FORMAT_ALL	  (FORMAT_MASK&~(FORMAT_RAW|FORMAT_MTREE))
+#else
+/* Compile without these.  Make sure the constants are as above */
+#define FORMAT_ALL	  (FORMAT_MASK&~(0x04000000|0x01000000))
+#endif
 
 static void
 enable_type(archive_wrapper *ar, int type,
