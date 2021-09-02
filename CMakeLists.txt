@@ -6,7 +6,15 @@ include("../cmake/PrologPackage.cmake")
 if(POLICY CMP0074)
   cmake_policy(SET CMP0074 NEW)
 endif()
-find_package(LibArchive)
+
+# The native FindLibArchive is rather naive.  This allows overruling
+# the libarchive dependencies
+if(LibArchive_LIBRARIES AND LibArchive_INCLUDE_DIRS)
+  set(LibArchive_FOUND ON)
+else()
+  find_package(LibArchive)
+endif()
+
 if(LibArchive_FOUND)
 set(CMAKE_REQUIRED_LIBRARIES ${CMAKE_REQUIRED_LIBRARIES} ${LibArchive_LIBRARIES})
 set(CMAKE_REQUIRED_INCLUDES ${CMAKE_REQUIRED_INCLUDES} ${LibArchive_INCLUDE_DIRS})
