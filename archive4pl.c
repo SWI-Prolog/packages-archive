@@ -206,7 +206,9 @@ release_archive(atom_t symbol)
 { archive_wrapper *ar = PL_blob_data(symbol, NULL, NULL);
   struct archive *a;
 
-  assert(ar->status != AR_OPENED_ENTRY);
+  // TODO: the following isn't true if we do
+  //    archive_open_named/3 without intervening close:
+  // assert(ar->status != AR_OPENED_ENTRY);
 
   if ( (a=ar->archive) )
   { ar->archive = NULL;

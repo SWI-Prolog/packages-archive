@@ -72,6 +72,8 @@ target_include_directories(
 
 install_dll(${LibArchive_LIBRARIES})
 
+test_libs(archive)
+
 pkg_doc(archive
 	SOURCE archive.pl archive4pl.tex
 	DEPENDS archive)

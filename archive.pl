@@ -65,19 +65,34 @@ The following example lists the entries in an archive:
 
   ```
   list_archive(File) :-
-        archive_open(File, Archive, []),
-        repeat,
-           (   archive_next_header(Archive, Path)
-           ->  format('~w~n', [Path]),
-               fail
-           ;   !,
-               archive_close(Archive)
-           ).
+      setup_call_cleanup(
+          archive_open(File, Archive, []),
+          (   repeat,
+              (   archive_next_header(Archive, Path)
+              ->  format('~w~n', [Path]),
+                  fail
+              ;   !
+              )
+          ),
+          archive_close(Archive)).
+  ```
+
+Here  is an  alternative way  of  doing this,  using archive_foldl/4,  a
+higher level predicate.
+
+  ```
+  list_archive2(File) :-
+      list_archive(File, Headers),
+      maplist(writeln, Headers).
+
+  list_archive2(File, Headers) :-
+      archive_foldl(add_header, File, Headers, []).
+
+  add_header(Path, _, [Path|Paths], Paths).
   ```
 
 Here is another example which counts the files in the archive and prints
-file  type  information.  It  uses    archive_foldl/4,  a  higher  level
-predicate:
+file  type  information, also using archive_foldl/4:
 
   ```
   print_entry(Path, Handle, Cnt0, Cnt1) :-
@@ -85,7 +100,7 @@ predicate:
       format('File ~w is of type ~w~n', [Path, Type]),
       Cnt1 is Cnt0 + 1.
 
-  list_archive(File) :-
+  list_archive_headers(File) :-
       archive_foldl(print_entry, File, 0, FileCount),
       format('We have ~w files', [FileCount]).
   ```
@@ -187,13 +202,13 @@ archive_open(File, Mode, Archive, Options) :-
 %   This can be used to open a   stream  to an archive entry without
 %   having to worry about closing the archive:
 %
-%     ==
+%     ```
 %     archive_open_named(ArchiveFile, EntryName, Stream) :-
-%         archive_open(ArchiveFile, Handle, []),
-%         archive_next_header(Handle, Name),
-%         archive_open_entry(Handle, Stream),
+%         archive_open(ArchiveFile, Archive, []),
+%         archive_next_header(Archive, EntryName),
+%         archive_open_entry(Archive, Stream),
 %         archive_close(Archive).
-%     ==
+%     ```
 
 
 %!  archive_property(+Handle, ?Property) is nondet.
@@ -216,7 +231,7 @@ defined_archive_property(filter(_)).
 %!  archive_next_header(+Handle, -Name) is semidet.
 %
 %   Forward to the next entry of the  archive for which Name unifies
-%   with the pathname of the entry. Fails   silently  if the name of
+%   with the pathname of the entry. Fails   silently  if the end  of
 %   the  archive  is  reached  before  success.  Name  is  typically
 %   specified if a  single  entry  must   be  accessed  and  unbound
 %   otherwise. The following example opens  a   Prolog  stream  to a
@@ -224,13 +239,13 @@ defined_archive_property(filter(_)).
 %   close/1 and the archive  must   be  closed using archive_close/1
 %   after the data has been used.   See also setup_call_cleanup/3.
 %
-%     ==
-%     open_archive_entry(ArchiveFile, Entry, Stream) :-
+%     ```
+%     open_archive_entry(ArchiveFile, EntryName, Stream) :-
 %         open(ArchiveFile, read, In, [type(binary)]),
 %         archive_open(In, Archive, [close_parent(true)]),
-%         archive_next_header(Archive, Entry),
+%         archive_next_header(Archive, EntryName),
 %         archive_open_entry(Archive, Stream).
-%     ==
+%     ```
 %
 %   @error permission_error(next_header, archive, Handle) if a
 %   previously opened entry is not closed.
