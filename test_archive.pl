@@ -36,13 +36,12 @@
 :- module(test_archive,
 	  [ test_archive/0
 	  ]).
-
-:- asserta(user:file_search_path(foreign, '.')).
-:- asserta(user:file_search_path(library, '.')).
-
 :- use_module(library(plunit)).
 :- use_module(library(archive)).
 :- use_module(library(readutil), [read_line_to_string/2]).
+:- use_module(library(apply), [maplist/3, maplist/2]).
+:- use_module(library(filesex), [directory_file_path/3, relative_file_name/3]).
+:- use_module(library(lists), [nth1/3]).
 
 /* This is a very minimal test suite, which was written when fixing
    some memory leak issues. */
@@ -51,13 +50,14 @@ test_archive :-
     run_tests([ archive
               ]).
 
-:- begin_tests(archive).
+:- begin_tests(archive,
+               [ condition(archive_has_format(zip))
+               ]).
 
 % The following is derived from check_installation/0 for archive:
 
 test(smoke_test_open) :-
-    tmp_file_stream(utf8, ArchivePath, Out),
-    close(Out),
+    create_tmp_file(ArchivePath),
     % archive_open should error because the file is empty.
     catch(archive_open(ArchivePath, A, []), E, true),
     (   var(E)
@@ -70,32 +70,32 @@ test(create_and_entries,
      [FilesOut == Entries,
       setup(create_tmp_file(ArchivePath)),
       cleanup(delete_file(ArchivePath))]) :-
-    create_archive_file(ArchivePath, FilesOut, _),
+    create_archive_file(ArchivePath, _, FilesOut, _),
     archive_entries(ArchivePath, Entries).
 
 test(create_and_open_named,
-     [Line1 == "/*  Part of SWI-Prolog", % 1st line of this file */
-      setup(create_tmp_file(ArchivePath)),
+     [setup(create_tmp_file(ArchivePath)),
       cleanup(delete_file(ArchivePath))]) :-
-    create_archive_file(ArchivePath, _, ExampleSourceFile),
+    create_archive_file(ArchivePath, SrcDir, _, ExampleSourceFile),
+    file_first_line(SrcDir, ExampleSourceFile, Line1),
     archive_open_named(ArchivePath, ExampleSourceFile, TestArchiveStream),
     read_line_to_string(TestArchiveStream, Line1),
     close(TestArchiveStream).
 
 test(create_and_open_named_no_close, % same as above but without close/1
-     [Line1 == "/*  Part of SWI-Prolog", % 1st line of this file */
-      setup(create_tmp_file(ArchivePath)),
+     [setup(create_tmp_file(ArchivePath)),
       cleanup(delete_file(ArchivePath))]) :-
-    create_archive_file(ArchivePath, _, ExampleSourceFile),
+    create_archive_file(ArchivePath, SrcDir, _, ExampleSourceFile),
+    file_first_line(SrcDir, ExampleSourceFile, Line1),
     archive_open_named(ArchivePath, ExampleSourceFile, TestArchiveStream),
     read_line_to_string(TestArchiveStream, Line1).
 
 test(create_and_open_named_twice_no_close,
-     [Line1 == "/*  Part of SWI-Prolog", % 1st line of this file */
-      setup(create_tmp_file(ArchivePath)),
+     [setup(create_tmp_file(ArchivePath)),
       cleanup(delete_file(ArchivePath))]) :-
-    create_archive_file(ArchivePath, _, ExampleSourceFile),
-    archive_open_named(ArchivePath, 'CTestTestfile.cmake', _Stream0),
+    create_archive_file(ArchivePath, SrcDir, _, ExampleSourceFile),
+    file_first_line(SrcDir, ExampleSourceFile, Line1),
+    archive_open_named(ArchivePath, 'swipl.rc', _Stream0),
     archive_open_named(ArchivePath, ExampleSourceFile, TestArchiveStream),
     read_line_to_string(TestArchiveStream, Line1).
 
@@ -104,26 +104,26 @@ test(create_and_open_named_fail, % Same as above but with bad EntryName
      [fail,
       setup(create_tmp_file(ArchivePath)),
       cleanup(delete_file(ArchivePath))]) :-
-    create_archive_file(ArchivePath, _, _),
+    create_archive_file(ArchivePath, _, _, _),
     archive_open_named(ArchivePath, 'XXX', _TestArchiveStream).
 
 % TODO: following test causes memory leak:
 test(create_and_open_archive_entry,
-     [Line1 == "/*  Part of SWI-Prolog", % 1st line of this file */
-      setup(create_tmp_file(ArchivePath)),
+     [setup(create_tmp_file(ArchivePath)),
       cleanup(delete_file(ArchivePath))]) :-
-    create_archive_file(ArchivePath, _, _),
-    open_archive_entry(ArchivePath, 'home/library/archive.pl', TestArchiveStream),
+    create_archive_file(ArchivePath, SrcDir, _, ExampleSourceFile),
+    file_first_line(SrcDir, ExampleSourceFile, Line1),
+    open_archive_entry(ArchivePath, ExampleSourceFile, TestArchiveStream),
     read_line_to_string(TestArchiveStream, Line1),
     close(TestArchiveStream).
 
 % TODO: following test causes memory leak:
 test(create_and_open_archive_entry_no_close, % same as above but without close/1
-     [Line1 == "/*  Part of SWI-Prolog", % 1st line of this file */
-      setup(create_tmp_file(ArchivePath)),
+     [setup(create_tmp_file(ArchivePath)),
       cleanup(delete_file(ArchivePath))]) :-
-    create_archive_file(ArchivePath, _, _),
-    open_archive_entry(ArchivePath, 'home/library/archive.pl', TestArchiveStream),
+    create_archive_file(ArchivePath, SrcDir, _, ExampleSourceFile),
+    file_first_line(SrcDir, ExampleSourceFile, Line1),
+    open_archive_entry(ArchivePath, ExampleSourceFile, TestArchiveStream),
     read_line_to_string(TestArchiveStream, Line1).
 
 % TODO: following test causes memory leak:
@@ -131,17 +131,15 @@ test(create_and_open_archive_entry_no_close, % same as above but bad EntryName
      [fail,
       setup(create_tmp_file(ArchivePath)),
       cleanup(delete_file(ArchivePath))]) :-
-    create_archive_file(ArchivePath, _, _),
+    create_archive_file(ArchivePath, _, _, _),
     open_archive_entry(ArchivePath, 'XXXl', _TestArchiveStream).
 
 % TODO: following test causes memory leak:
 test(create_and_entries_error,
      [error(existence_error(file, 'foobar-qqsv'), _),
-      setup((tmp_file_stream(utf8, ArchivePath, Out),
-             close(Out))),
+      setup(create_tmp_file(ArchivePath)),
       cleanup(delete_file(ArchivePath))]) :-
     FilesOut = ['foobar-qqsv'], % doesn't exist
-    % TODO: what if zip doesn't exist on the system?
     archive_create(ArchivePath, FilesOut, [format(zip)]).
 
 :- end_tests(archive).
@@ -150,26 +148,42 @@ create_tmp_file(Path) :-
     tmp_file_stream(utf8, Path, Out),
     close(Out).
 
-create_archive_file(ArchivePath, FilesOut, ExampleSourceFile) :-
-    source_dir(ArchiveSourceDir),
-    FilesOut = ['packages/archive/config.h', 'home/library/archive.pl', 'CTestTestfile.cmake'],
-    ExampleSourceFile = 'home/library/archive.pl',
-    % TODO: what if zip doesn't exist on the system?
-    archive_create(ArchivePath, FilesOut, [format(zip), directory(ArchiveSourceDir)]).
+%!  create_archive_file(+ArchiveFile, -RootDir, -Files, -Example) is det.
+%
+%   Create  a  `zip`  archive  using  three  files  from  the  installed
+%   SWI-Prolog tree.
 
-source_dir(ArchiveSourceDir) :-
-    % ARCHIVE_SOURCE_DIR can be set in CMakeLists.txt by
-    %   set_tests_properties(archive:archive PROPERTIES ENVIRONMENT "ARCHIVE_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}")
-    % and then accessed by
-    %   getenv('ARCHIVE_SOURCE_DIR', ArchiveSourceDir)
-    % However, this causes problems with cross-compilation, so instead.
-    (   getenv('ASAN_OPTIONS', _),
-        absolute_file_name('../../build.sanitize', ArchiveSourceDir,
-                           [file_errors(fail), file_type(directory)])
-    ->  true
-    ;   absolute_file_name('../..', ArchiveSourceDir,
-                           [file_errors(error), file_type(directory)])
-    ).
+create_archive_file(ArchivePath, ArchiveSourceDir, FilesOut, ExampleSourceFile) :-
+    Files = [swi('include/SWI-Prolog.h'), library('archive.pl'), swi('swipl.rc')],
+    absolute_file_name(swi(.), ArchiveSourceDir, [file_type(directory), access(read)]),
+    maplist(ar_input(ArchiveSourceDir), Files, FilesOut),
+    nth1(2, FilesOut, ExampleSourceFile),
+    archive_create(ArchivePath, FilesOut,
+                   [ format(zip),
+                     directory(ArchiveSourceDir)
+                   ]).
+
+ar_input(Dir, Spec, File) :-
+    directory_file_path(Dir, dummy, RelTo),
+    absolute_file_name(Spec, AbsFile, [access(read)]),
+    relative_file_name(AbsFile, RelTo, File).
+
+archive_has_format(Format) :-
+    create_tmp_file(Path),
+    catch(archive_open(Path, A, [format(Format)]), E, true),
+    (   var(E)
+    ->  archive_close(A),
+        delete_file(Path)
+    ;   true
+    ),
+    \+ subsumes_term(error(domain_error(format, _),_), E).
+
+file_first_line(SrcDir, File, Line) :-
+    directory_file_path(SrcDir, File, Path),
+    setup_call_cleanup(
+        open(Path, read, In),
+        read_line_to_string(In, Line),
+        close(In)).
 
 % Code from documentation of archive_close/1.
 archive_open_named(ArchiveFile, EntryName, Stream) :-
