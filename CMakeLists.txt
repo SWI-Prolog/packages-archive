@@ -32,13 +32,6 @@ AC_CHECK_FUNCS(archive_read_support_filter_bzip2
 	       archive_read_support_filter_uu
 	       archive_read_support_filter_xz)
 
-AC_CHECK_FUNCS(archive_read_support_compression_bzip2
-	       archive_read_support_compression_compress
-	       archive_read_support_compression_gzip
-	       archive_read_support_compression_lzma
-	       archive_read_support_compression_none
-	       archive_read_support_compression_xz)
-
 AC_CHECK_FUNCS(archive_read_support_format_7zip
 	       archive_read_support_format_ar
 	       archive_read_support_format_cab
@@ -54,9 +47,16 @@ AC_CHECK_FUNCS(archive_read_support_format_7zip
 	       archive_read_support_format_xar
 	       archive_read_support_format_zip)
 
+AC_CHECK_FUNCS(archive_read_set_seek_callback)
+
+# TODO: The following aren't needed?
 AC_CHECK_FUNCS(archive_read_free
 	       archive_filter_count
-	       archive_read_open1)
+	       archive_read_open1
+	       archive_read_open2)
+
+AC_CHECK_FUNCS(archive_write_free
+	       archive_write_open)
 
 configure_file(config.h.cmake config.h)
 

@@ -131,18 +131,20 @@ archive_open(Stream, Archive, Options) :-
 
 %!  archive_open(+Data, +Mode, -Archive, +Options) is det.
 %
-%   Open the archive in Data and unify  Archive with a handle to the
-%   opened archive. Data is either a file  or a stream that contains
-%   a valid archive. Details are   controlled by Options. Typically,
-%   the option close_parent(true) is used  to   close  stream if the
-%   archive is closed using archive_close/1.  For other options, the
-%   defaults are typically fine. The option format(raw) must be used
-%   to process compressed  streams  that   do  not  contain explicit
-%   entries (e.g., gzip'ed data)  unambibuously.   The  =raw= format
-%   creates a _pseudo archive_ holding a single member named =data=.
+%   Open the  archive in  Data and  unify Archive with  a handle  to the
+%   opened archive.  Data is either a  file or a stream  that contains a
+%   valid  archive.  Mode  is  either `read`  or  `write`.  Details  are
+%   controlled by  Options. Typically, the option  close_parent(true) is
+%   used  to close  an  entry  stream if  the  archive  is closed  using
+%   archive_close/1.  For  other options when reading,  the defaults are
+%   typically fine  - for writing,  a valid format and  optional filters
+%   must be specified.   The option format(raw) must be  used to process
+%   compressed  streams  that do  not  contain  explicit entries  (e.g.,
+%   gzip'ed  data) unambibuously.   The =raw=  format creates  a _pseudo
+%   archive_ holding a single member named =data=.
 %
 %     * close_parent(+Boolean)
-%     If this option is =true= (default =false=), Stream is closed
+%     If this option is =true=  (default =false=), Data stream is closed
 %     if archive_close/1 is called on Archive.
 %
 %     * compression(+Compression)
@@ -169,16 +171,18 @@ archive_open(Stream, Archive, Options) :-
 %     =iso9660=, =lha=, =mtree=, =rar=, =raw=, =tar=, =xar= and =zip=.
 %     The value =all= is default for read.
 %
-%   Note that the actually supported   compression types and formats
-%   may vary depending on the version   and  installation options of
-%   the underlying libarchive  library.  This   predicate  raises  a
-%   domain  error  if  the  (explicitly)  requested  format  is  not
-%   supported.
+%   Note that the  actually supported compression types  and formats may
+%   vary  depending  on the  version  and  installation options  of  the
+%   underlying libarchive  library.  This  predicate raises a  domain or
+%   permission error if  the (explicitly) requested format  or filter is
+%   not supported.
 %
 %   @error  domain_error(filter, Filter) if the requested
-%           filter is not supported.
+%           filter is invalid (e.g., `all` for writing).
 %   @error  domain_error(format, Format) if the requested
 %           format type is not supported.
+%   @error  permission_error(set, filter, Filter) if the requested
+%           filter is not supported.
 
 archive_open(stream(Stream), Mode, Archive, Options) :-
     !,
@@ -195,12 +199,12 @@ archive_open(File, Mode, Archive, Options) :-
 
 %!  archive_close(+Archive) is det.
 %
-%   Close the archive.  If  close_parent(true)   is  specified,  the
-%   underlying stream is closed too.  If   there  is an entry opened
-%   with  archive_open_entry/2,  actually  closing  the  archive  is
-%   delayed until the stream associated with   the  entry is closed.
-%   This can be used to open a   stream  to an archive entry without
-%   having to worry about closing the archive:
+%   Close  the   archive.   If   close_parent(true)  was   specified  in
+%   archive_open/4, the underlying entry stream  is closed too. If there
+%   is an  entry opened with archive_open_entry/2,  actually closing the
+%   archive is  delayed until  the stream associated  with the  entry is
+%   closed.   This can  be used  to open  a stream  to an  archive entry
+%   without having to worry about closing the archive:
 %
 %     ```
 %     archive_open_named(ArchiveFile, EntryName, Stream) :-
