@@ -45,39 +45,9 @@
 #include <errno.h>
 #include <ctype.h>
 
-#ifndef HAVE_ARCHIVE_READ_FREE
-#define archive_read_free(ar) archive_read_finish(ar)
-#define archive_write_free(ar) archive_write_finish(ar)
-#endif
-
 #if ARCHIVE_VERSION_NUMBER < 3000000
-#define archive_read_support_filter_all archive_read_support_compression_all
-
-#ifdef HAVE_ARCHIVE_READ_SUPPORT_COMPRESSION_BZIP2
-#define HAVE_ARCHIVE_READ_SUPPORT_FILTER_BZIP2 1
-#define archive_read_support_filter_bzip2 archive_read_support_compression_bzip2
+#error "Requires libarchive 3.0.0 or later"
 #endif
-#ifdef HAVE_ARCHIVE_READ_SUPPORT_COMPRESSION_COMPRESS
-#define HAVE_ARCHIVE_READ_SUPPORT_FILTER_COMPRESS
-#define archive_read_support_filter_compress archive_read_support_compression_compress
-#endif
-#ifdef HAVE_ARCHIVE_READ_SUPPORT_COMPRESSION_GZIP
-#define HAVE_ARCHIVE_READ_SUPPORT_FILTER_GZIP
-#define archive_read_support_filter_gzip archive_read_support_compression_gzip
-#endif
-#ifdef HAVE_ARCHIVE_READ_SUPPORT_COMPRESSION_LZMA
-#define HAVE_ARCHIVE_READ_SUPPORT_FILTER_LZMA
-#define archive_read_support_filter_lzma archive_read_support_compression_lzma
-#endif
-#ifdef HAVE_ARCHIVE_READ_SUPPORT_COMPRESSION_NONE
-#define HAVE_ARCHIVE_READ_SUPPORT_FILTER_NONE
-#define archive_read_support_filter_none archive_read_support_compression_none
-#endif
-#ifdef HAVE_ARCHIVE_READ_SUPPORT_COMPRESSION_XZ
-#define HAVE_ARCHIVE_READ_SUPPORT_FILTER_XZ
-#define archive_read_support_filter_xz archive_read_support_compression_xz
-#endif
-#endif /*ARCHIVE_VERSION_NUMBER < 3000000*/
 
 
 /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -107,10 +77,24 @@ typedef struct archive_wrapper
   int			closed_archive;	/* Archive was closed with open entry */
   struct archive *	archive;	/* Actual archive handle */
   struct archive_entry *entry;		/* Current entry */
-  int                   how;            /* r/w mode */
+  int                   how;            /* r/w mode ('r' or 'w') */
 } archive_wrapper;
 
-static void free_archive(archive_wrapper *ar);
+#if 0
+/* For debugging: */
+static const char*
+ar_status_str(ar_status status)
+{ switch ( status )
+  { case AR_VIRGIN:       return "AR_VIRGIN";
+    case AR_OPENED:       return "AR_OPENED";
+    case AR_NEW_ENTRY:    return "AR_NEW_ENTRY";
+    case AR_OPENED_ENTRY: return "AR_OPENED_ENTRY";
+    case AR_CLOSED_ENTRY: return "AR_CLOSED_ENTRY";
+    default:              return "AR_???";
+  }
+}
+#endif
+
 
 
 		 /*******************************
@@ -188,10 +172,14 @@ int PL_existence_error3(const char* type, const char* object, term_t in)
 		 *******************************/
 
 static int archive_free_handle(archive_wrapper *ar)
-{ if ( ar->how == 'r' )
-    return archive_read_free(ar->archive);
+{ int rc;
+  /* It's safe to pass NULL to archive_read_free(), archive_write_free() */
+  if ( ar->how == 'r' )
+    rc = archive_read_free(ar->archive);
   else
-    return archive_write_free(ar->archive);
+    rc = archive_write_free(ar->archive);
+  ar->archive = NULL;
+  return rc;
 }
 
 static void
@@ -204,28 +192,22 @@ acquire_archive(atom_t symbol)
 static int
 release_archive(atom_t symbol)
 { archive_wrapper *ar = PL_blob_data(symbol, NULL, NULL);
-  struct archive *a;
 
-  // TODO: the following isn't true if we do
-  //    archive_open_named/3 without intervening close:
-  // assert(ar->status != AR_OPENED_ENTRY);
+  assert(ar->magic == ARCHIVE_MAGIC);
 
-  if ( (a=ar->archive) )
-  { ar->archive = NULL;
-    archive_free_handle(ar);
+  /* TODO: The following assert isn't always true */
+  /* assert(ar->status != AR_OPENED_ENTRY); */
 
-  }
-
-  free_archive(ar);
-  PL_free(ar);
+  archive_entry_free(ar->entry); /* Safe even if !ar->entry */
+  archive_free_handle(ar);
 
   return TRUE;
 }
 
 static int
 compare_archives(atom_t a, atom_t b)
-{ archive_wrapper *ara = PL_blob_data(a, NULL, NULL);
-  archive_wrapper *arb = PL_blob_data(b, NULL, NULL);
+{ const archive_wrapper *ara = PL_blob_data(a, NULL, NULL);
+  const archive_wrapper *arb = PL_blob_data(b, NULL, NULL);
 
   return ( ara > arb ?  1 :
 	   ara < arb ? -1 : 0
@@ -234,7 +216,7 @@ compare_archives(atom_t a, atom_t b)
 
 static int
 write_archive(IOSTREAM *s, atom_t symbol, int flags)
-{ archive_wrapper *ar = PL_blob_data(symbol, NULL, NULL);
+{ const archive_wrapper *ar = PL_blob_data(symbol, NULL, NULL);
 
   Sfprintf(s, "<archive>(%p)", ar);
 
@@ -243,7 +225,7 @@ write_archive(IOSTREAM *s, atom_t symbol, int flags)
 
 static PL_blob_t archive_blob =
 { PL_BLOB_MAGIC,
-  PL_BLOB_NOCOPY,
+  0,
   "archive",
   release_archive,
   compare_archives,
@@ -304,7 +286,7 @@ ar_close(struct archive *a, void *cdata)
 
 static ssize_t
 ar_read(struct archive *a, void *cdata, const void **buffer)
-{ archive_wrapper *ar = cdata;
+{ const archive_wrapper *ar = cdata;
   if ( Sfeof(ar->data) )
   { if ( Sferror(ar->data) )
       return -1;
@@ -322,16 +304,12 @@ ar_read(struct archive *a, void *cdata, const void **buffer)
 
 static ssize_t
 ar_write(struct archive *a, void *cdata, const void *buffer, size_t n)
-{ archive_wrapper *ar = cdata;
+{ const archive_wrapper *ar = cdata;
   return Sfwrite(buffer, 1, n, ar->data);
 }
 
-#ifndef __LA_INT64_T
-#define __LA_INT64_T off_t
-#endif
-
-static __LA_INT64_T
-ar_skip(struct archive *a, void *cdata, __LA_INT64_T request)
+static la_int64_t
+ar_skip(struct archive *a, void *cdata, la_int64_t request)
 { archive_wrapper *ar = cdata;
 
   if ( Sseek64(ar->data, request, SIO_SEEK_CUR) == 0 )
@@ -341,9 +319,8 @@ ar_skip(struct archive *a, void *cdata, __LA_INT64_T request)
   return 0;				/* cannot skip; library will read */
 }
 
-#ifdef HAVE_ARCHIVE_READ_OPEN1
-static __LA_INT64_T
-ar_seek(struct archive *a, void *cdata, __LA_INT64_T request, int whence)
+static la_int64_t
+ar_seek(struct archive *a, void *cdata, la_int64_t request, int whence)
 { archive_wrapper *ar = cdata;
   int s_whence;
 
@@ -361,27 +338,21 @@ ar_seek(struct archive *a, void *cdata, __LA_INT64_T request, int whence)
 
   return ARCHIVE_FATAL;
 }
-#endif
 
 
 		 /*******************************
 		 *	      PROLOG		*
 		 *******************************/
 
-static void
-free_archive(archive_wrapper *ar)
-{
-}
-
 static int
-archive_error(archive_wrapper *ar, int rc)
+archive_error(const archive_wrapper *ar, int rc)
 { int eno = archive_errno(ar->archive);
   const char *s = archive_error_string(ar->archive);
   term_t ex;
 
   if ( eno == 0 )
     eno = rc;
-  if ( s == NULL )
+  if ( !s )
   { switch(rc)
     { case ARCHIVE_EOF:    s = "eof";    break;
       case ARCHIVE_OK:     s = "ok";     break;
@@ -404,6 +375,10 @@ archive_error(archive_wrapper *ar, int rc)
 
   return FALSE;
 }
+
+#ifndef HAVE_ARCHIVE_READ_SET_SEEK_CALLBACK
+#error "Requires archive.h with archive_read_set_seek_callback()"
+#endif
 
 
 #define	FILTER_ALL	  0x0000ffff
@@ -508,41 +483,44 @@ enable_type(archive_wrapper *ar, int type,
 
 static foreign_t
 archive_open_stream(term_t data, term_t mode, term_t handle, term_t options)
-{ IOSTREAM *datas;
-  archive_wrapper *ar;
+{ archive_wrapper *ar;
   term_t tail = PL_copy_term_ref(options);
   term_t head = PL_new_term_ref();
   term_t arg  = PL_new_term_ref();
-  atom_t mname;
-  char how = 'r';
-  int flags = 0;
   int rc = ARCHIVE_OK;				/* silence compiler */
 
-  if ( PL_get_atom_ex(mode, &mname) )
-  { if ( mname == ATOM_write )
-    { how = 'w';
-      flags = SIO_OUTPUT;
-    } else if ( mname == ATOM_read )
-    { how = 'r';
-      flags = SIO_INPUT;
-    } else
-    { return PL_domain_error("io_mode", mode);
-    }
-  } else
-  { return FALSE;
+  { archive_wrapper ar_local;
+    atom_t a;
+    memset(&ar_local, 0, sizeof ar_local);
+    ar_local.magic = ARCHIVE_MAGIC;
+
+    if ( !PL_unify_blob(handle, &ar_local, sizeof ar_local, &archive_blob) ||
+         !PL_get_atom_ex(handle, &a) )
+      return FALSE;
+    ar = PL_blob_data(a, NULL, NULL);
   }
 
-  if ( !PL_get_stream(data, &datas, flags) )
-    return FALSE;
 
-  ar = PL_malloc(sizeof(*ar));
-  memset(ar, 0, sizeof(*ar));
-  ar->data = datas;
-  ar->how = how;
-  ar->magic = ARCHIVE_MAGIC;
+  { atom_t mname;
+    int flags;
 
-  if ( !PL_unify_blob(handle, ar, sizeof(*ar), &archive_blob) )
-    return FALSE;
+    if ( PL_get_atom_ex(mode, &mname) )
+    { if ( mname == ATOM_write )
+      { ar->how = 'w';
+        flags = SIO_OUTPUT;
+      } else if ( mname == ATOM_read )
+      { ar->how = 'r';
+        flags = SIO_INPUT;
+      } else
+      { return PL_domain_error("io_mode", mode);
+      }
+    } else
+    { return FALSE;
+    }
+
+    if ( !PL_get_stream(data, &ar->data, flags) )
+      return FALSE;
+  }
 
   while( PL_get_list_ex(tail, head, tail) )
   { atom_t name;
@@ -556,10 +534,10 @@ archive_open_stream(term_t data, term_t mode, term_t handle, term_t options)
 
       if ( !PL_get_atom_ex(arg, &c) )
 	return FALSE;
-      if ( how == 'w' && ((ar->type & FILTER_MASK) != 0) )
+      if ( ar->how == 'w' && ((ar->type & FILTER_MASK) != 0) )
          return PL_permission_error("set", "filter", arg);
       if ( c == ATOM_all )
-      { if (how == 'w')
+      { if (ar->how == 'w')
           return PL_domain_error("write_filter", arg);
 	ar->type |= FILTER_ALL;
       }
@@ -618,10 +596,10 @@ archive_open_stream(term_t data, term_t mode, term_t handle, term_t options)
 
       if ( !PL_get_atom_ex(arg, &f) )
 	return FALSE;
-      if ( how == 'w' && (( ar->type & FORMAT_MASK ) != 0 ) )
+      if ( ar->how == 'w' && (( ar->type & FORMAT_MASK ) != 0 ) )
           return PL_permission_error("set", "format", arg);
       if ( f == ATOM_all )
-      { if ( how == 'w' )
+      { if ( ar->how == 'w' )
           return PL_domain_error("write_format", arg);
 	ar->type |= FORMAT_ALL;
       }
@@ -691,13 +669,13 @@ archive_open_stream(term_t data, term_t mode, term_t handle, term_t options)
   if ( !PL_get_nil_ex(tail) )
     return FALSE;
 
-  if ( how == 'r' )
+  if ( ar->how == 'r' )
   { if ( !(ar->type & FILTER_ALL) )
       ar->type |= FILTER_ALL;
     if ( !(ar->type & FORMAT_MASK) )
       ar->type |= FORMAT_ALL;
   }
-  if ( how == 'r' )
+  if ( ar->how == 'r' )
   { if ( !(ar->archive = archive_read_new()) )
       return PL_resource_error("memory");
 
@@ -793,7 +771,6 @@ archive_open_stream(term_t data, term_t mode, term_t handle, term_t options)
        enable_type(ar, FORMAT_ZIP,     archive_read_support_format_zip);
 #endif
      }
-#ifdef HAVE_ARCHIVE_READ_OPEN1
      archive_read_set_callback_data(ar->archive, ar);
      archive_read_set_open_callback(ar->archive, ar_open);
      archive_read_set_read_callback(ar->archive, ar_read);
@@ -805,15 +782,7 @@ archive_open_stream(term_t data, term_t mode, term_t handle, term_t options)
      { ar->status = AR_OPENED;
        return TRUE;
      }
-#else
-     if ( (rc=archive_read_open2(
-		  ar->archive, ar,
-		  ar_open, ar_read, ar_skip, ar_close)) == ARCHIVE_OK )
-     { ar->status = AR_OPENED;
-       return TRUE;
-     }
-#endif
-  } else if ( how == 'w' )
+  } else if ( ar->how == 'w' )
   { if ( !(ar->archive = archive_write_new()) )
       return PL_resource_error("memory");
      /* Prevent libarchive from padding the last block to 10240 bytes. Some decompressors,
@@ -875,28 +844,22 @@ archive_open_stream(term_t data, term_t mode, term_t handle, term_t options)
     { return PL_existence_error3("option", "filter", options);
     }
 #endif
-#ifdef HAVE_ARCHIVE_WRITE_OPEN1
-    archive_write_set_callback_data(ar->archive, ar);
-    archive_write_set_open_callback(ar->archive, ar_open);
-    archive_write_set_write_callback(ar->archive, ar_write);
-    archive_write_set_close_callback(ar->archive, ar_close);
-
-    if ( (rc=archive_write_open1(ar->archive)) == ARCHIVE_OK )
-    { ar->status = AR_OPENED;
-      return TRUE;
-    }
-#else
     if ( (rc=archive_write_open(ar->archive, ar,
 				ar_open, ar_write, ar_close)) == ARCHIVE_OK )
     { ar->status = AR_OPENED;
       return TRUE;
     }
-#endif
+  } else {
+    assert(0);
   }
 
   return archive_error(ar, rc);
 }
 
+
+#ifndef HAVE_ARCHIVE_FILTER_COUNT
+#error "Requires archive.h with archive_filter_count()"
+#endif
 
 static foreign_t
 archive_property(term_t archive, term_t prop, term_t value)
@@ -908,7 +871,6 @@ archive_property(term_t archive, term_t prop, term_t value)
        !PL_get_atom_ex(prop, &pn) )
     return FALSE;
 
-#ifdef HAVE_ARCHIVE_FILTER_COUNT
   if ( pn == ATOM_filter )
   { int i, fcount = archive_filter_count(ar->archive);
     term_t tail = PL_copy_term_ref(value);
@@ -926,7 +888,6 @@ archive_property(term_t archive, term_t prop, term_t value)
     }
     return PL_unify_nil(tail);
   }
-#endif
 
   return FALSE;
 }
@@ -945,8 +906,11 @@ archive_next_header(term_t archive, term_t name)
        return PL_permission_error("next_header", "archive", archive);
     if ( !PL_get_atom_chars(name, &pathname) )
        return PL_type_error("atom", name);
-    ar->entry = archive_entry_new();
-    if ( ar->entry == NULL )
+    if ( ar->entry )
+      archive_entry_clear(ar->entry);
+    else
+      ar->entry = archive_entry_new();
+    if ( !ar->entry )
        return PL_resource_error("memory");
     archive_entry_set_pathname(ar->entry, pathname);
     /* libarchive-3.1.2 does not tolerate an empty size with zip. Later versions may though - it is fixed in git as of Dec 2013.
@@ -1169,14 +1133,14 @@ archive_set_header_property(term_t archive, term_t field)
 
 static ssize_t
 ar_read_entry(void *handle, char *buf, size_t size)
-{ archive_wrapper *ar = handle;
+{ const archive_wrapper *ar = handle;
 
   return archive_read_data(ar->archive, buf, size);
 }
 
 static ssize_t
 ar_write_entry(void *handle, char *buf, size_t size)
-{ archive_wrapper *ar = handle;
+{ const archive_wrapper *ar = handle;
 
   size_t written = archive_write_data(ar->archive, buf, size);
   /* In older version of libarchive (at least until 3.1.12), archive_write_data returns 0 for
@@ -1215,7 +1179,7 @@ ar_close_entry(void *handle)
 
 static int
 ar_control_entry(void *handle, int op, void *data)
-{ archive_wrapper *ar = handle;
+{ const archive_wrapper *ar = handle;
 
   (void)ar;
 
@@ -1272,6 +1236,7 @@ archive_open_entry(term_t archive, term_t stream)
     if ( ar->status == AR_NEW_ENTRY )
     { archive_write_header(ar->archive, ar->entry);
       archive_entry_free(ar->entry);
+      ar->entry = NULL;
     } else
     { return PL_permission_error("access", "archive_entry", archive);
     }

@@ -142,6 +142,18 @@ test(create_and_entries_error,
     FilesOut = ['foobar-qqsv'], % doesn't exist
     archive_create(ArchivePath, FilesOut, [format(zip)]).
 
+test(bad_unify_blob,
+     [fail,
+      setup(create_tmp_file(ArchivePath)),
+      cleanup(delete_file(ArchivePath))]) :-
+    archive_open(ArchivePath, read, not_an_archive_blob, []).
+
+test(bad_mode,
+     [error(domain_error(io_mode, neither_read_nor_write), _),
+      setup(create_tmp_file(ArchivePath)),
+      cleanup(delete_file(ArchivePath))]) :-
+    archive_open(ArchivePath, neither_read_nor_write, _Archive, []).
+
 :- end_tests(archive).
 
 create_tmp_file(Path) :-
