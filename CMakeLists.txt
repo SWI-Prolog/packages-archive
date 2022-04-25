@@ -7,16 +7,19 @@ if(POLICY CMP0074)
   cmake_policy(SET CMP0074 NEW)
 endif()
 
-# The native FindLibArchive is rather naive.  This allows overruling
-# the libarchive dependencies
-if(LibArchive_LIBRARIES AND LibArchive_INCLUDE_DIRS)
-  set(LibArchive_FOUND ON)
-else()
-  find_package(LibArchive)
-endif()
+find_package(LibArchive)
 
 if(LibArchive_FOUND)
-set(CMAKE_REQUIRED_LIBRARIES ${CMAKE_REQUIRED_LIBRARIES} ${LibArchive_LIBRARIES})
+
+if(NOT LibArchive_OS_LIBS)
+if(WIN32)
+  set(LibArchive_OS_LIBS nettle.lib xml2.lib iconv.lib regex.lib expat.lib lzma.lib zstd.lib lz4.lib bz2.lib z.lib bcrypt.lib ws2_32.lib)
+else()
+  set(LibArchive_OS_LIBS)
+endif()
+endif()
+
+set(CMAKE_REQUIRED_LIBRARIES ${CMAKE_REQUIRED_LIBRARIES} ${LibArchive_LIBRARIES} ${LibArchive_OS_LIBS})
 set(CMAKE_REQUIRED_INCLUDES ${CMAKE_REQUIRED_INCLUDES} ${LibArchive_INCLUDE_DIRS})
 
 AC_CHECK_FUNCS(archive_read_support_filter_bzip2
@@ -64,7 +67,7 @@ swipl_plugin(
     archive
     MODULE archive4pl
     C_SOURCES archive4pl.c
-    C_LIBS ${LibArchive_LIBRARIES}
+    C_LIBS ${LibArchive_LIBRARIES} ${LibArchive_OS_LIBS}
     PL_LIBS archive.pl)
 target_include_directories(
     plugin_archive4pl BEFORE PRIVATE
