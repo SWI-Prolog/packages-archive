@@ -11,6 +11,7 @@ endif()
 # the libarchive dependencies
 if(LibArchive_LIBRARIES AND LibArchive_INCLUDE_DIRS)
   set(LibArchive_FOUND ON)
+  message("Using flags for LibArchive ${LibArchive_LIBRARIES} and ${LibArchive_INCLUDE_DIRS}")
 else()
   find_package(LibArchive)
 endif()

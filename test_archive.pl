@@ -166,7 +166,13 @@ create_tmp_file(Path) :-
 %   SWI-Prolog tree.
 
 create_archive_file(ArchivePath, ArchiveSourceDir, FilesOut, ExampleSourceFile) :-
-    Files = [swi('include/SWI-Prolog.h'), library('archive.pl'), swi('swipl.rc')],
+    % The files have been chosen to have different first lines
+    Files = [swi('doc/packages/examples/pldoc/README'),
+             swi('doc/packages/examples/plunit/simple.pl'),
+             swi('doc/packages/examples/pengines/web/chunking.html'),
+             swi('doc/packages/examples/chr/bool.chr'),
+             swi('doc/packages/examples/http/pwp/context.pwp'),
+             swi('swipl.rc')],
     absolute_file_name(swi(.), ArchiveSourceDir, [file_type(directory), access(read)]),
     maplist(ar_input(ArchiveSourceDir), Files, FilesOut),
     nth1(2, FilesOut, ExampleSourceFile),

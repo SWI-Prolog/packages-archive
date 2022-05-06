@@ -132,20 +132,25 @@ archive_open(Stream, Archive, Options) :-
 %!  archive_open(+Data, +Mode, -Archive, +Options) is det.
 %
 %   Open the  archive in  Data and  unify Archive with  a handle  to the
-%   opened archive.  Data is either a  file or a stream  that contains a
-%   valid  archive.  Mode  is  either `read`  or  `write`.  Details  are
-%   controlled by  Options. Typically, the option  close_parent(true) is
-%   used  to close  an  entry  stream if  the  archive  is closed  using
-%   archive_close/1.  For  other options when reading,  the defaults are
-%   typically fine  - for writing,  a valid format and  optional filters
-%   must be specified.   The option format(raw) must be  used to process
-%   compressed  streams  that do  not  contain  explicit entries  (e.g.,
-%   gzip'ed  data) unambibuously.   The =raw=  format creates  a _pseudo
-%   archive_ holding a single member named =data=.
+%   opened archive.  Data is either a  file name (as accepted by open/4)
+%   or a stream  that has been opened with the  option type(binary).  If
+%   Data  is an  already  open  stream, the  caller  is responsible  for
+%   closing it  (but see option  close_parent(true)) and must  not close
+%   the stream  until after archive_close/1  is called.  Mode  is either
+%   `read` or  `write`.  Details are controlled  by Options.  Typically,
+%   the option close_parent(true) is used  to also close the Data stream
+%   if the archive  is closed using archive_close/1.   For other options
+%   when reading, the defaults are typically fine - for writing, a valid
+%   format  and   optional  filters  must  be   specified.   The  option
+%   format(raw) must be  used to process compressed streams  that do not
+%   contain explicit  entries (e.g.,  gzip'ed data)  unambibuously.  The
+%   =raw=  format creates  a _pseudo  archive_ holding  a single  member
+%   named =data=.
 %
 %     * close_parent(+Boolean)
 %     If this option is =true=  (default =false=), Data stream is closed
-%     if archive_close/1 is called on Archive.
+%     when archive_close/1 is called on Archive. If Data is a file name,
+%     the default is =true=.
 %
 %     * compression(+Compression)
 %     Synomym for filter(Compression).  Deprecated.
@@ -154,7 +159,7 @@ archive_open(Stream, Archive, Options) :-
 %     Support the indicated filter. This option may be
 %     used multiple times to support multiple filters. In read mode,
 %     If no filter options are provided, =all= is assumed. In write
-%     mode, none is assumed.
+%     mode, =none= is assumed.
 %     Supported values are =all=, =bzip2=, =compress=, =gzip=,
 %     =grzip=, =lrzip=, =lzip=, =lzma=, =lzop=, =none=, =rpm=, =uu=
 %     and =xz=. The value =all= is default for read, =none= for write.
