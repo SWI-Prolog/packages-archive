@@ -38,7 +38,6 @@
 	  ]).
 :- use_module(library(plunit)).
 :- use_module(library(archive)).
-:- use_module(library(readutil), [read_line_to_string/2]).
 :- use_module(library(apply), [maplist/3, maplist/2]).
 :- use_module(library(filesex), [directory_file_path/3, relative_file_name/3]).
 :- use_module(library(lists), [nth1/3]).
@@ -77,27 +76,27 @@ test(create_and_open_named,
      [setup(create_tmp_file(ArchivePath)),
       cleanup(delete_file(ArchivePath))]) :-
     create_archive_file(ArchivePath, SrcDir, _, ExampleSourceFile),
-    file_first_line(SrcDir, ExampleSourceFile, Line1),
+    file_contents(SrcDir, ExampleSourceFile, Contents1),
     archive_open_named(ArchivePath, ExampleSourceFile, TestArchiveStream),
-    read_line_to_string(TestArchiveStream, Line1),
+    read_string(TestArchiveStream, _Len, Contents1),
     close(TestArchiveStream).
 
 test(create_and_open_named_no_close, % same as above but without close/1
      [setup(create_tmp_file(ArchivePath)),
       cleanup(delete_file(ArchivePath))]) :-
     create_archive_file(ArchivePath, SrcDir, _, ExampleSourceFile),
-    file_first_line(SrcDir, ExampleSourceFile, Line1),
+    file_contents(SrcDir, ExampleSourceFile, Contents1),
     archive_open_named(ArchivePath, ExampleSourceFile, TestArchiveStream),
-    read_line_to_string(TestArchiveStream, Line1).
+    read_string(TestArchiveStream, _Len, Contents1).
 
 test(create_and_open_named_twice_no_close,
      [setup(create_tmp_file(ArchivePath)),
       cleanup(delete_file(ArchivePath))]) :-
     create_archive_file(ArchivePath, SrcDir, _, ExampleSourceFile),
-    file_first_line(SrcDir, ExampleSourceFile, Line1),
+    file_contents(SrcDir, ExampleSourceFile, Contents1),
     archive_open_named(ArchivePath, 'swipl.rc', _Stream0),
     archive_open_named(ArchivePath, ExampleSourceFile, TestArchiveStream),
-    read_line_to_string(TestArchiveStream, Line1).
+    read_string(TestArchiveStream, _Len, Contents1).
 
 % TODO: following test causes memory leak:
 test(create_and_open_named_fail, % Same as above but with bad EntryName
@@ -112,9 +111,9 @@ test(create_and_open_archive_entry,
      [setup(create_tmp_file(ArchivePath)),
       cleanup(delete_file(ArchivePath))]) :-
     create_archive_file(ArchivePath, SrcDir, _, ExampleSourceFile),
-    file_first_line(SrcDir, ExampleSourceFile, Line1),
+    file_contents(SrcDir, ExampleSourceFile, Contents1),
     open_archive_entry(ArchivePath, ExampleSourceFile, TestArchiveStream),
-    read_line_to_string(TestArchiveStream, Line1),
+    read_string(TestArchiveStream, _Len, Contents1),
     close(TestArchiveStream).
 
 % TODO: following test causes memory leak:
@@ -122,9 +121,9 @@ test(create_and_open_archive_entry_no_close, % same as above but without close/1
      [setup(create_tmp_file(ArchivePath)),
       cleanup(delete_file(ArchivePath))]) :-
     create_archive_file(ArchivePath, SrcDir, _, ExampleSourceFile),
-    file_first_line(SrcDir, ExampleSourceFile, Line1),
+    file_contents(SrcDir, ExampleSourceFile, Contents1),
     open_archive_entry(ArchivePath, ExampleSourceFile, TestArchiveStream),
-    read_line_to_string(TestArchiveStream, Line1).
+    read_string(TestArchiveStream, _Len, Contents1).
 
 % TODO: following test causes memory leak:
 test(create_and_open_archive_entry_no_close, % same as above but bad EntryName
@@ -190,11 +189,11 @@ archive_has_format(Format) :-
     ),
     \+ subsumes_term(error(domain_error(format, _),_), E).
 
-file_first_line(SrcDir, File, Line) :-
+file_contents(SrcDir, File, Contents) :-
     directory_file_path(SrcDir, File, Path),
     setup_call_cleanup(
-        open(Path, read, In),
-        read_line_to_string(In, Line),
+        open(Path, read, In, [type(binary)]),
+        read_string(In, _Len, Contents),
         close(In)).
 
 % Code from documentation of archive_close/1.

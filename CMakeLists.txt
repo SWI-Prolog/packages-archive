@@ -12,7 +12,7 @@ endif()
 if(LibArchive_LIBRARIES AND LibArchive_INCLUDE_DIRS)
   set(LibArchive_FOUND ON)
 else()
-  find_package(LibArchive)
+  find_package(LibArchive 3.0.0)
 endif()
 
 if(LibArchive_FOUND)
@@ -47,16 +47,8 @@ AC_CHECK_FUNCS(archive_read_support_format_7zip
 	       archive_read_support_format_xar
 	       archive_read_support_format_zip)
 
+#introduced in v3.0.0b
 AC_CHECK_FUNCS(archive_read_set_seek_callback)
-
-# TODO: The following aren't needed?
-AC_CHECK_FUNCS(archive_read_free
-	       archive_filter_count
-	       archive_read_open1
-	       archive_read_open2)
-
-AC_CHECK_FUNCS(archive_write_free
-	       archive_write_open)
 
 configure_file(config.h.cmake config.h)
 
