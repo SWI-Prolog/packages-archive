@@ -46,6 +46,7 @@
 #include <ctype.h>
 
 #if ARCHIVE_VERSION_NUMBER < 3000000
+/* This should never happen if cmake is set up properly */
 #error "Requires libarchive 3.0.0 or later"
 #endif
 
@@ -139,7 +140,10 @@ typedef struct archive_wrapper
   int			how;		/* r/w mode ('r' or 'w') */
 } archive_wrapper;
 
-/* Convenience function - sets status to AR_ERROR and returns rc */
+/* Convenience function - sets ar->status to AR_ERROR and returns rc.
+   It is intended to be wrapped around PL_xxx_error() calls.  If
+   ar->status is set to AR_ERROR, that all further use of ar will
+   throw an error - this may be overkill for some errors. */
 static int
 ar_set_status_error(archive_wrapper *ar, int rc)
 { if ( ar )
@@ -319,7 +323,7 @@ static PL_blob_t archive_blob =
 
 
 static int
-term_to_archive_wrapper(term_t t, archive_wrapper **arp)
+get_archive(term_t t, archive_wrapper **arp)
 { PL_blob_t *type;
   void *data;
 
@@ -371,6 +375,14 @@ libarchive_close_cb(struct archive *a, void *cdata)
 static ssize_t
 libarchive_read_cb(struct archive *a, void *cdata, const void **buffer)
 { const archive_wrapper *ar = cdata;
+  /* In the folowing code, Sfeof() call S__fillbuff() if the buffer is empty.
+     TODO: Why is the code written this way instead of using Sfread()?
+           One reason could be that apparently libarchive doesn't
+           provide the buffer to dump the data in so need to maintain
+           such a buffer ourselves and copy the data or use the
+           stream's buffer.  Looks a little hacky.  On the other hand,
+           there is little wrong with it and if something changes the
+           tests will tell us. */
   if ( Sfeof(ar->data) )
   { if ( Sferror(ar->data) )
       return -1;
@@ -952,7 +964,7 @@ archive_property(term_t archive, term_t prop, term_t value)
   atom_t pn;
   const char *s;
 
-  if ( !term_to_archive_wrapper(archive, &ar) ||
+  if ( !get_archive(archive, &ar) ||
        !PL_get_atom_ex(prop, &pn) )
     return FALSE;
 
@@ -983,7 +995,7 @@ archive_next_header(term_t archive, term_t name)
 { archive_wrapper *ar;
   int rc;
 
-  if ( !term_to_archive_wrapper(archive, &ar) )
+  if ( !get_archive(archive, &ar) )
     return FALSE;
   if ( ar->how == 'w' )
   { char* pathname = NULL;
@@ -1036,7 +1048,7 @@ archive_close(term_t archive)
 { archive_wrapper *ar;
   int rc;
 
-  if ( !term_to_archive_wrapper(archive, &ar) )
+  if ( !get_archive(archive, &ar) )
     return FALSE;
 
   if ( ar->status == AR_OPENED_ENTRY )
@@ -1063,7 +1075,7 @@ archive_header_prop_(term_t archive, term_t field)
 { archive_wrapper *ar;
   functor_t prop;
 
-  if ( !term_to_archive_wrapper(archive, &ar) )
+  if ( !get_archive(archive, &ar) )
     return FALSE;
 
   if ( !PL_get_functor(field, &prop) )
@@ -1151,7 +1163,7 @@ archive_set_header_property(term_t archive, term_t field)
 { archive_wrapper *ar;
   functor_t prop;
 
-  if ( !term_to_archive_wrapper(archive, &ar) )
+  if ( !get_archive(archive, &ar) )
     return FALSE;
 
   if ( !PL_get_functor(field, &prop) )
@@ -1306,7 +1318,7 @@ archive_open_entry(term_t archive, term_t stream)
 
   /* If you make changes here, be sure to also change ar_entry_close() */
 
-  if ( !term_to_archive_wrapper(archive, &ar) )
+  if ( !get_archive(archive, &ar) )
     return FALSE;
   if ( ar->how == 'r' )
   { if ( (entry_data=Snew(ar, SIO_INPUT|SIO_RECORDPOS, &ar_entry_read_functions)) )
