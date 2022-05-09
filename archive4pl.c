@@ -137,6 +137,7 @@ typedef struct archive_wrapper
   struct archive *	archive;	/* Actual archive handle */
   struct archive_entry *entry;		/* Current entry */
   int			how;		/* r/w mode ('r' or 'w') */
+  int			agc;		/* subject to AGC */
 } archive_wrapper;
 
 /* Convenience function - sets ar->status to AR_ERROR and returns rc.
@@ -161,7 +162,8 @@ static archive_wrapper archive_wrapper_init_value =
   FALSE,		/* closed_archive	*/
   NULL,			/* archive		*/
   NULL,			/* entry		*/
-  ' '			/* how			*/
+  ' ',			/* how			*/
+  FALSE			/* agc			*/
 };
 
 #if 0
@@ -279,6 +281,7 @@ ar_w_release_cb(atom_t symbol)
 { archive_wrapper *ar = PL_blob_data(symbol, NULL, NULL);
 
   assert(ar->magic == ARCHIVE_MAGIC);
+  ar->agc = TRUE;
 
   /* TODO: The following assert isn't always true */
   /* assert(ar->status != AR_OPENED_ENTRY); */
@@ -360,7 +363,7 @@ libarchive_close_cb(struct archive *a, void *cdata)
 { archive_wrapper *ar = cdata;
   PL_release_stream(ar->data);
   if ( ar->close_parent && ar->archive )
-  { if ( Sclose(ar->data) != 0 )
+  { if ( Sgcclose(ar->data, ar->agc ? SIO_CLOSE_FORCE : 0) != 0 )
     { archive_set_error(ar->archive, errno, "Close failed");
       ar->data = NULL;
       return ARCHIVE_FATAL;
