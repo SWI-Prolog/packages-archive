@@ -3,7 +3,8 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2012-2018, VU University Amsterdam
+    Copyright (c)  2012-2022, VU University Amsterdam
+			      SWI-Prolog Solutions b.v.
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -44,6 +45,7 @@
 #include <string.h>
 #include <errno.h>
 #include <ctype.h>
+#include <limits.h>
 
 #if ARCHIVE_VERSION_NUMBER < 3000000
 #error "Requires libarchive 3.0.0 or later"
@@ -120,6 +122,7 @@ the archive, the current header and some state information.
 typedef enum ar_status
 { AR_VIRGIN = 0,
   AR_OPENED_ARCHIVE,
+  AR_CLOSING_ARCHIVE,
   AR_NEW_ENTRY,
   AR_OPENED_ENTRY,
   AR_CLOSED_ENTRY,
@@ -140,6 +143,9 @@ typedef struct archive_wrapper
   int			agc;		/* subject to AGC */
 } archive_wrapper;
 
+static int	prepare_archive_stream(IOSTREAM *s, atom_t symbol);
+static void	unprepare_archive_stream(IOSTREAM *s);
+
 /* Convenience function - sets ar->status to AR_ERROR and returns rc.
    It is intended to be wrapped around PL_xxx_error() calls.  If
    ar->status is set to AR_ERROR, that all further use of ar will
@@ -148,7 +154,8 @@ static int
 ar_set_status_error(archive_wrapper *ar, int rc)
 { if ( ar )
   { if ( ar->status == AR_VIRGIN && ar->data )
-    { PL_release_stream(ar->data);
+    { unprepare_archive_stream(ar->data);
+      PL_release_stream(ar->data);
       ar->data = NULL;
     }
 
@@ -260,18 +267,29 @@ int PL_existence_error3(const char* type, const char* object, term_t in)
   return FALSE;
 }
 
+
 		 /*******************************
 		 *	  SYMBOL WRAPPER	*
 		 *******************************/
 
-static int archive_free_handle(archive_wrapper *ar)
+static int
+archive_free_handle(archive_wrapper *ar)
 { int rc;
-  /* It's safe to pass NULL to archive_read_free(), archive_write_free() */
-  if ( ar->how == 'r' )
-    rc = archive_read_free(ar->archive);
-  else
-    rc = archive_write_free(ar->archive);
+
+  if ( ar->archive )
+  { ar->status = AR_CLOSING_ARCHIVE;
+
+    if ( ar->how == 'r' )
+      rc = archive_read_free(ar->archive);
+    else
+      rc = archive_write_free(ar->archive);
+  } else
+    rc = ARCHIVE_OK;
+
   ar->archive = NULL;
+  ar->entry   = NULL;
+  ar->symbol  = 0;
+
   return rc;
 }
 
@@ -293,8 +311,8 @@ ar_w_release_cb(atom_t symbol)
   /* assert(ar->status != AR_OPENED_ENTRY); */
 
   /* Only writeable archives have ar->entry allocated by archive_entry_new() */
-  if (ar->how == 'w')
-    archive_entry_free(ar->entry); /* Safe even if !ar->entry */
+  if ( ar->how == 'w' && ar->entry )
+    archive_entry_free(ar->entry);
   archive_free_handle(ar);
 
   return TRUE;
@@ -367,14 +385,26 @@ libarchive_open_cb(struct archive *a, void *cdata)
 static int
 libarchive_close_cb(struct archive *a, void *cdata)
 { archive_wrapper *ar = cdata;
-  PL_release_stream(ar->data);
-  if ( ar->close_parent && ar->archive )
-  { if ( Sgcclose(ar->data, ar->agc ? SIO_CLOSE_FORCE : 0) != 0 )
-    { archive_set_error(ar->archive, errno, "Close failed");
+
+  if ( ar->data )
+  { unprepare_archive_stream(ar->data);
+    PL_release_stream(ar->data);
+    if ( ar->close_parent && ar->data )
+    { if ( ar->agc )
+      { if ( Sgcclose(ar->data, SIO_CLOSE_FORCE) != 0 )
+	{ Sdprintf("WARNING: AGC failed to close archive\n");
+	  ar->data = NULL;
+	  return ARCHIVE_FATAL;
+	}
+      } else
+      { if ( Sclose(ar->data) != 0 )
+	{ archive_set_error(ar->archive, errno, "Close failed");
+	  ar->data = NULL;
+	  return ARCHIVE_FATAL;
+	}
+      }
       ar->data = NULL;
-      return ARCHIVE_FATAL;
     }
-    ar->data = NULL;
   }
 
   return ARCHIVE_OK;				/* TBD: close_parent */
@@ -383,6 +413,12 @@ libarchive_close_cb(struct archive *a, void *cdata)
 static ssize_t
 libarchive_read_cb(struct archive *a, void *cdata, const void **buffer)
 { const archive_wrapper *ar = cdata;
+
+  if ( !ar->data )
+  { Sdprintf("Archive stream is closed!\n");
+    return -1;					/* closed! */
+  }
+
   /* In the folowing code, Sfeof() call S__fillbuff() if the buffer is empty.
      TODO: Why is the code written this way instead of using Sfread()?
            One reason could be that apparently libarchive doesn't
@@ -409,12 +445,19 @@ libarchive_read_cb(struct archive *a, void *cdata, const void **buffer)
 static ssize_t
 libarchive_write_cb(struct archive *a, void *cdata, const void *buffer, size_t n)
 { const archive_wrapper *ar = cdata;
+
+  if ( !ar->data )
+    return -1;					/* closed! */
+
   return Sfwrite(buffer, 1, n, ar->data);
 }
 
 static la_int64_t
 libarchive_skip_cb(struct archive *a, void *cdata, la_int64_t request)
 { archive_wrapper *ar = cdata;
+
+  if ( !ar->data )
+    return -1;					/* closed! */
 
   if ( Sseek64(ar->data, request, SIO_SEEK_CUR) == 0 )
     return request;
@@ -428,6 +471,9 @@ static la_int64_t
 libarchive_seek_cb(struct archive *a, void *cdata, la_int64_t request, int whence)
 { archive_wrapper *ar = cdata;
   int s_whence;
+
+  if ( !ar->data )
+    return ARCHIVE_FATAL;		/* closed! */
 
   switch (whence) {
     case SEEK_SET: s_whence=SIO_SEEK_SET; break;
@@ -444,6 +490,107 @@ libarchive_seek_cb(struct archive *a, void *cdata, la_int64_t request, int whenc
   return ARCHIVE_FATAL;
 }
 #endif
+
+		 /*******************************
+		 *	   ARCHIVE STREAM	*
+		 *******************************/
+
+typedef struct ar_stream
+{ void	       *saved_handle;
+  IOFUNCTIONS  *saved_functions;
+  atom_t	archive;
+} ar_stream;
+
+static ssize_t
+ar_data_read(void *handle, char *buf, size_t size)
+{ const ar_stream *ars = handle;
+
+  return ars->saved_functions->read(ars->saved_handle, buf, size);
+}
+
+static ssize_t
+ar_data_write(void *handle, char *buf, size_t size)
+{ const ar_stream *ars = handle;
+
+  return ars->saved_functions->write(ars->saved_handle, buf, size);
+}
+
+static int64_t
+ar_data_seek64(void *handle, int64_t pos, int whence)
+{ const ar_stream *ars = handle;
+
+  if ( ars->saved_functions->seek64 )
+  { return ars->saved_functions->seek64(ars->saved_handle, pos, whence);
+  } else if ( ars->saved_functions->seek )
+  { if ( pos <= LONG_MAX && pos >= LONG_MIN )
+    { return ars->saved_functions->seek(ars->saved_handle, pos, whence);
+    } else
+    { errno = EINVAL;
+      return -1;
+    }
+  } else
+  { errno = EPIPE;
+    return -1;
+  }
+}
+
+static int
+ar_data_close(void *handle)
+{ const ar_stream *ars = handle;
+  archive_wrapper *ar  = PL_blob_data(ars->archive, NULL, NULL);
+
+  if ( ar->status == AR_CLOSING_ARCHIVE )
+  { return ars->saved_functions->close(ars->saved_handle);
+  } else
+  { Sdprintf("Closing archive stream while not closing archive\n");
+    ar->data = NULL;
+    return 0;
+  }
+}
+
+static int
+ar_data_control(void *handle, int op, void *data)
+{ const ar_stream *ars = handle;
+
+  return ars->saved_functions->control(ars->saved_handle, op, data);
+}
+
+static IOFUNCTIONS ar_data_functions =
+{ ar_data_read,
+  ar_data_write,
+  NULL,						/* seek */
+  ar_data_close,
+  ar_data_control,
+  ar_data_seek64
+};
+
+static int
+prepare_archive_stream(IOSTREAM *s, atom_t symbol)
+{ ar_stream *ars = PL_malloc(sizeof(*ars));
+
+  if ( ars )
+  { ars->saved_handle = s->handle;
+    ars->saved_functions = s->functions;
+    ars->archive = symbol;
+    s->handle = ars;
+    s->functions = &ar_data_functions;
+
+    return TRUE;
+  }
+
+  return PL_resource_error("memory");
+}
+
+static void
+unprepare_archive_stream(IOSTREAM *s)
+{ if ( s->functions == &ar_data_functions )
+  { ar_stream *ars = s->handle;
+
+    s->handle = ars->saved_handle;
+    s->functions = ars->saved_functions;
+    PL_free(ars);
+  }
+}
 
 
 		 /*******************************
@@ -620,7 +767,8 @@ archive_open_stream(term_t data, term_t mode, term_t handle, term_t options)
     { return ar_set_status_error(ar, FALSE);
     }
 
-    if ( !PL_get_stream(data, &ar->data, flags) )
+    if ( !PL_get_stream(data, &ar->data, flags) ||
+	 !prepare_archive_stream(ar->data, ar->symbol) )
       return ar_set_status_error(ar, FALSE);
   }
 
@@ -1059,11 +1207,7 @@ archive_close(term_t archive)
 
     return TRUE;
   } else if ( (rc=archive_free_handle(ar)) == ARCHIVE_OK )
-  { ar->entry = NULL;
-    ar->archive = NULL;
-    ar->symbol = 0;
-
-    return TRUE;
+  { return TRUE;
   }
 
   return archive_error(ar, rc);
@@ -1262,11 +1406,7 @@ ar_entry_close_cb(void *handle)
   { if ( ar->archive )
     { int rc;
 
-      if ( (rc=archive_free_handle(ar)) == ARCHIVE_OK )
-      { ar->entry = NULL;
-	ar->archive = NULL;
-	ar->symbol = 0;
-      } else
+      if ( (rc=archive_free_handle(ar)) != ARCHIVE_OK )
 	return -1;
     }
   }
