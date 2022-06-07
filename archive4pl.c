@@ -147,7 +147,13 @@ typedef struct archive_wrapper
 static int
 ar_set_status_error(archive_wrapper *ar, int rc)
 { if ( ar )
+  { if ( ar->status == AR_VIRGIN && ar->data )
+    { PL_release_stream(ar->data);
+      ar->data = NULL;
+    }
+
     ar->status = AR_ERROR;
+  }
   return rc;
 }
 
@@ -611,11 +617,11 @@ archive_open_stream(term_t data, term_t mode, term_t handle, term_t options)
       { return ar_set_status_error(ar, PL_domain_error("io_mode", mode));
       }
     } else
-    { return FALSE;
+    { return ar_set_status_error(ar, FALSE);
     }
 
     if ( !PL_get_stream(data, &ar->data, flags) )
-      return FALSE;
+      return ar_set_status_error(ar, FALSE);
   }
 
   while( PL_get_list_ex(tail, head, tail) )
@@ -629,7 +635,7 @@ archive_open_stream(term_t data, term_t mode, term_t handle, term_t options)
     { atom_t c;
 
       if ( !PL_get_atom_ex(arg, &c) )
-	return FALSE;
+	return ar_set_status_error(ar, FALSE);
       if ( ar->how == 'w' && ((ar->type & FILTER_MASK) != 0) )
         return ar_set_status_error(ar, PL_permission_error("set", "filter", arg));
       if ( c == ATOM_all )
@@ -691,7 +697,7 @@ archive_open_stream(term_t data, term_t mode, term_t handle, term_t options)
     { atom_t f;
 
       if ( !PL_get_atom_ex(arg, &f) )
-	return FALSE;
+	return ar_set_status_error(ar, FALSE);
       if ( ar->how == 'w' && (( ar->type & FORMAT_MASK ) != 0 ) )
         return ar_set_status_error(ar, PL_permission_error("set", "format", arg));
       if ( f == ATOM_all )
@@ -759,11 +765,11 @@ archive_open_stream(term_t data, term_t mode, term_t handle, term_t options)
 	return ar_set_status_error(ar, PL_domain_error("format", arg));
     } else if ( name == ATOM_close_parent )
     { if ( !PL_get_bool_ex(arg, &ar->close_parent) )
-	return FALSE;
+	return ar_set_status_error(ar, FALSE);
     }
   }
   if ( !PL_get_nil_ex(tail) )
-    return FALSE;
+    return ar_set_status_error(ar, FALSE);
 
   if ( ar->how == 'r' )
   { if ( !(ar->type & FILTER_ALL) )
