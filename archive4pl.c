@@ -3,7 +3,8 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2012-2018, VU University Amsterdam
+    Copyright (c)  2012-2022, VU University Amsterdam
+			      SWI-Prolog Solutions b.v.
     All rights reserved.
 
     Redistribution and use in source and binary forms, with or without
@@ -406,8 +407,8 @@ libarchive_write_cb(struct archive *a, void *cdata, const void *buffer, size_t n
   return Sfwrite(buffer, 1, n, ar->data);
 }
 
-static la_int64_t
-libarchive_skip_cb(struct archive *a, void *cdata, la_int64_t request)
+static int64_t
+libarchive_skip_cb(struct archive *a, void *cdata, int64_t request)
 { archive_wrapper *ar = cdata;
 
   if ( Sseek64(ar->data, request, SIO_SEEK_CUR) == 0 )
@@ -418,8 +419,8 @@ libarchive_skip_cb(struct archive *a, void *cdata, la_int64_t request)
 }
 
 #ifdef HAVE_ARCHIVE_READ_SET_SEEK_CALLBACK
-static la_int64_t
-libarchive_seek_cb(struct archive *a, void *cdata, la_int64_t request, int whence)
+static int64_t
+libarchive_seek_cb(struct archive *a, void *cdata, int64_t request, int whence)
 { archive_wrapper *ar = cdata;
   int s_whence;
 
