@@ -49,8 +49,12 @@ test_archive :-
     run_tests([ archive
               ]).
 
+can_test :-
+    archive_has_format(zip),
+    \+ current_prolog_flag(wine_version, _).
+
 :- begin_tests(archive,
-               [ condition(archive_has_format(zip))
+               [ condition(can_test)
                ]).
 
 % The following is derived from check_installation/0 for archive:
