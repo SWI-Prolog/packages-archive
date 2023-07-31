@@ -98,7 +98,7 @@ test(create_and_open_named_twice_no_close,
       cleanup(delete_file(ArchivePath))]) :-
     create_archive_file(ArchivePath, SrcDir, _, ExampleSourceFile),
     file_contents(SrcDir, ExampleSourceFile, Contents1),
-    archive_open_named(ArchivePath, 'swipl.rc', _Stream0),
+    archive_open_named(ArchivePath, 'boot.prc', _Stream0),
     archive_open_named(ArchivePath, ExampleSourceFile, TestArchiveStream),
     read_string(TestArchiveStream, _Len, Contents1).
 
@@ -169,7 +169,7 @@ create_tmp_file(Path) :-
 %   SWI-Prolog tree.
 
 create_archive_file(ArchivePath, ArchiveSourceDir, FilesOut, ExampleSourceFile) :-
-    Files = [swi('include/SWI-Prolog.h'), library('archive.pl'), swi('swipl.rc')],
+    Files = [swi('include/SWI-Prolog.h'), library('archive.pl'), swi('boot.prc')],
     absolute_file_name(swi(.), ArchiveSourceDir, [file_type(directory), access(read)]),
     maplist(ar_input(ArchiveSourceDir), Files, FilesOut),
     nth1(2, FilesOut, ExampleSourceFile),
