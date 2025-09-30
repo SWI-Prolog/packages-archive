@@ -3,7 +3,7 @@
     Author:        Jan Wielemaker
     E-mail:        J.Wielemaker@vu.nl
     WWW:           http://www.swi-prolog.org
-    Copyright (c)  2012-2022, VU University Amsterdam
+    Copyright (c)  2012-2025, VU University Amsterdam
 			      SWI-Prolog Solutions b.v.
     All rights reserved.
 
@@ -39,6 +39,7 @@
 #ifdef __WINDOWS__
 #define LIBARCHIVE_STATIC 1
 #endif
+#include <stdbool.h>
 #include <archive.h>
 #include <archive_entry.h>
 #include <assert.h>
@@ -141,15 +142,16 @@ typedef struct archive_wrapper
   int			agc;		/* subject to AGC */
 } archive_wrapper;
 
-/* Convenience function - sets ar->status to AR_ERROR and returns rc.
+/* Convenience function - sets ar->status to AR_ERROR and returns false.
    It is intended to be wrapped around PL_xxx_error() calls.  If
    ar->status is set to AR_ERROR, that all further use of ar will
    throw an error - this may be overkill for some errors. */
-static int
-ar_set_status_error(archive_wrapper *ar, int rc)
+
+static bool
+ar_set_status_error(archive_wrapper *ar, bool rc)
 { if ( ar )
     ar->status = AR_ERROR;
-  return rc;
+  return false;
 }
 
 static archive_wrapper archive_wrapper_init_value =
@@ -325,7 +327,7 @@ static PL_blob_t archive_blob =
 };
 
 
-static int
+static bool
 get_archive(term_t t, archive_wrapper **arp)
 { PL_blob_t *type;
   void *data;
@@ -338,13 +340,13 @@ get_archive(term_t t, archive_wrapper **arp)
     if ( ar->symbol )
     { *arp = ar;
 
-      return TRUE;
+      return true;
     }
 
     return ar_set_status_error(ar, PL_permission_error("access", "closed_archive", t));
   }
 
-  return PL_type_error("archive", t);
+  return PL_type_error("archive", t),false;
 }
 
 
