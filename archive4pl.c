@@ -1147,7 +1147,7 @@ archive_header_prop_(term_t archive, term_t field)
       _PL_get_arg(1, field, arg);
 
       for(o=lwr; *s && o < lwr+sizeof(lwr); )
-	*o++ = tolower(*s++);
+        *o++ = (char) tolower(*s++); /* safe cast */
 
       *o = '\0';
 
