@@ -47,9 +47,6 @@ AC_CHECK_FUNCS(archive_read_support_format_7zip
 	       archive_read_support_format_xar
 	       archive_read_support_format_zip)
 
-#introduced in v3.0.0b
-AC_CHECK_FUNCS(archive_read_set_seek_callback)
-
 configure_file(config.h.cmake config.h)
 
 swipl_plugin(

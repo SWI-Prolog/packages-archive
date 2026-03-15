@@ -420,7 +420,6 @@ libarchive_skip_cb(struct archive *a, void *cdata, int64_t request)
   return 0;				/* cannot skip; library will read */
 }
 
-#ifdef HAVE_ARCHIVE_READ_SET_SEEK_CALLBACK
 static int64_t
 libarchive_seek_cb(struct archive *a, void *cdata, int64_t request, int whence)
 { archive_wrapper *ar = cdata;
@@ -440,7 +439,6 @@ libarchive_seek_cb(struct archive *a, void *cdata, int64_t request, int whence)
 
   return ARCHIVE_FATAL;
 }
-#endif
 
 
 		 /*******************************
@@ -874,9 +872,7 @@ archive_open_stream(term_t data, term_t mode, term_t handle, term_t options)
      archive_read_set_open_callback(ar->archive, libarchive_open_cb);
      archive_read_set_read_callback(ar->archive, libarchive_read_cb);
      archive_read_set_skip_callback(ar->archive, libarchive_skip_cb);
-#ifdef HAVE_ARCHIVE_READ_SET_SEEK_CALLBACK
      archive_read_set_seek_callback(ar->archive, libarchive_seek_cb);
-#endif
      archive_read_set_close_callback(ar->archive, libarchive_close_cb);
 
      if ( (rc=archive_read_open1(ar->archive)) == ARCHIVE_OK )
