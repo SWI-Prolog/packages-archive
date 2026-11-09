@@ -39,8 +39,11 @@
 :- use_module(library(plunit)).
 :- use_module(library(archive)).
 :- use_module(library(apply), [maplist/3, maplist/2]).
-:- use_module(library(filesex), [directory_file_path/3, relative_file_name/3]).
-:- use_module(library(lists), [nth1/3]).
+:- use_module(library(filesex), [directory_file_path/3, relative_file_name/3,
+                                 make_directory_path/1,
+                                 delete_directory_and_contents/1]).
+:- use_module(library(lists), [nth1/3, subtract/3]).
+:- use_module(library(debug), [assertion/1]).
 
 /* This is a very minimal test suite, which was written when fixing
    some memory leak issues. */
@@ -181,6 +184,65 @@ test(bad_mode,
       setup(create_tmp_file(ArchivePath)),
       cleanup(delete_file(ArchivePath))]) :-
     archive_open(ArchivePath, neither_read_nor_write, _Archive, []).
+
+test(extract_dotdot, [error(permission_error(extract, archive_entry, Name)),
+                      condition(can_test)]) :-
+    Name = 'sub/../../escape.txt',
+    extract_entry(Name).
+test(extract_absolute, [error(permission_error(extract, archive_entry, Name)),
+                        condition(can_test)]) :-
+    tmp_file(abs, Name),
+    call_cleanup(extract_entry(Name),
+                 assertion(\+ exists_file(Name))).
+test(extract_ok, [Files == [sub], condition(can_test)]) :-
+    extract_entry('sub/a.txt', Files).
+test(open_entry_no_header, [error(permission_error(access, archive_entry, _)),
+                            condition(can_test)]) :-
+    tmp_file(archive, Zip),
+    make_zip(Zip, 'a.txt'),
+    call_cleanup(
+        setup_call_cleanup(
+            archive_open(Zip, read, Archive, []),
+            archive_open_entry(Archive, _),
+            archive_close(Archive)),
+        delete_file(Zip)).
+
+%!  extract_entry(+Name) is det.
+%!  extract_entry(+Name, -Files) is det.
+%
+%   Create a zip archive holding a single entry  Name and extract it in
+%   a  new  temporary   directory.   Files   are   the   files  in  the
+%   directory after extraction.
+
+extract_entry(Name) :-
+    extract_entry(Name, _).
+
+extract_entry(Name, Files) :-
+    tmp_file(archive, Zip),
+    tmp_file(extract, Base),
+    directory_file_path(Base, out, Dir),
+    make_directory_path(Dir),
+    call_cleanup(
+        ( make_zip(Zip, Name),
+          archive_extract(Zip, Dir, []),
+          directory_files(Dir, Files0),
+          subtract(Files0, ['.', '..'], Files1),
+          msort(Files1, Files)
+        ),
+        ( delete_file(Zip),
+          delete_directory_and_contents(Base)
+        )).
+
+make_zip(Zip, Name) :-
+    setup_call_cleanup(
+        archive_open(Zip, write, Archive, [format(zip)]),
+        ( archive_next_header(Archive, Name),
+          setup_call_cleanup(
+              archive_open_entry(Archive, Out),
+              format(Out, 'pwned~n', []),
+              close(Out))
+        ),
+        archive_close(Archive)).
 
 :- end_tests(archive).
 
