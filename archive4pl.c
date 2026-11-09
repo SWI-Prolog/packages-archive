@@ -443,10 +443,25 @@ libarchive_seek_cb(struct archive *a, void *cdata, int64_t request, int whence)
 		 *******************************/
 
 static int
+archive_error_code(int eno, const char *s)
+{ term_t ex;
+
+  if ( ( (ex = PL_new_term_ref()) &&
+	 PL_unify_term(ex,
+		       PL_FUNCTOR, FUNCTOR_error2,
+			 PL_FUNCTOR, FUNCTOR_archive_error2,
+			   PL_INT, eno,
+			   PL_CHARS, s,
+			 PL_VARIABLE) ) )
+    return PL_raise_exception(ex);
+
+  return FALSE;
+}
+
+static int
 archive_error(const archive_wrapper *ar, int rc)
-{ int eno = archive_errno(ar->archive);
-  const char *s = archive_error_string(ar->archive);
-  term_t ex;
+{ int eno = ar->archive ? archive_errno(ar->archive) : 0;
+  const char *s = ar->archive ? archive_error_string(ar->archive) : NULL;
 
   if ( eno == 0 )
     eno = rc;
@@ -462,16 +477,7 @@ archive_error(const archive_wrapper *ar, int rc)
     }
   }
 
-  if ( ( (ex = PL_new_term_ref()) &&
-	 PL_unify_term(ex,
-		       PL_FUNCTOR, FUNCTOR_error2,
-			 PL_FUNCTOR, FUNCTOR_archive_error2,
-			   PL_INT, eno,
-			   PL_CHARS, s,
-			 PL_VARIABLE) ) )
-    return PL_raise_exception(ex);
-
-  return FALSE;
+  return archive_error_code(eno, s);
 }
 
 #define	FILTER_ALL	  0x0000ffff
@@ -1044,8 +1050,19 @@ archive_next_header(term_t archive, term_t name)
   }
 
   while ( (rc=archive_read_next_header(ar->archive, &ar->entry)) == ARCHIVE_OK )
-  { if ( PL_unify_wchars(name, PL_ATOM, -1,
-			 archive_entry_pathname_w(ar->entry)) )
+  { const wchar_t *wname = archive_entry_pathname_w(ar->entry);
+    const char *bname;
+    int ok;
+
+    if ( wname )
+    { ok = PL_unify_wchars(name, PL_ATOM, -1, wname);
+    } else if ( (bname = archive_entry_pathname(ar->entry)) )
+    { ok = PL_unify_chars(name, PL_ATOM, -1, bname); /* not in locale: bytes */
+    } else
+    { ok = FALSE;			/* no name */
+    }
+
+    if ( ok )
     { ar->status = AR_NEW_ENTRY;
       return TRUE;
     }
@@ -1072,15 +1089,19 @@ archive_close(term_t archive)
   { ar->closed_archive = TRUE;
 
     return TRUE;
-  } else if ( (rc=archive_free_handle(ar)) == ARCHIVE_OK )
-  { ar->entry = NULL;
+  } else
+  { int eno;
+
+    rc = archive_free_handle(ar);	/* frees ar->archive */
+    eno = errno;
+    ar->entry = NULL;
     ar->archive = NULL;
     ar->symbol = 0;
+    if ( rc == ARCHIVE_OK )
+      return TRUE;
 
-    return TRUE;
+    return archive_error_code(eno ? eno : rc, "close failed");
   }
-
-  return archive_error(ar, rc);
 }
 
 		 /*******************************
@@ -1163,7 +1184,7 @@ archive_header_prop_(term_t archive, term_t field)
       term_t arg = PL_new_term_ref();
       _PL_get_arg(1, field, arg);
 
-      for(o=lwr; *s && o < lwr+sizeof(lwr); )
+      for(o=lwr; *s && o < lwr+sizeof(lwr)-1; )
 	*o++ = (char)tolower(*s++);
 
       *o = '\0';
@@ -1301,6 +1322,8 @@ ar_entry_control_cb(void *handle, int op, void *data)
   { case SIO_SETENCODING:
       return 0;				/* allow switching encoding */
     case SIO_GETSIZE:
+      if ( !ar->entry || !archive_entry_size_is_set(ar->entry) )
+	return -1;
       *((int64_t*)data) = archive_entry_size(ar->entry);
       return 0;
     case SIO_FLUSHOUTPUT:
@@ -1338,7 +1361,9 @@ archive_open_entry(term_t archive, term_t stream)
   if ( !get_archive(archive, &ar) )
     return FALSE;
   if ( ar->how == 'r' )
-  { if ( (entry_data=Snew(ar, SIO_INPUT|SIO_RECORDPOS, &ar_entry_read_functions)) )
+  { if ( ar->status != AR_NEW_ENTRY )
+      return PL_permission_error("access", "archive_entry", archive);
+    if ( (entry_data=Snew(ar, SIO_INPUT|SIO_RECORDPOS, &ar_entry_read_functions)) )
     { ar->status = AR_OPENED_ENTRY;
       if ( PL_unify_stream(stream, entry_data) )
       { PL_register_atom(ar->symbol);	/* We may no longer reference the */
