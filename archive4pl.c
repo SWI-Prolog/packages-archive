@@ -240,7 +240,7 @@ static functor_t FUNCTOR_link_target1;
 static functor_t FUNCTOR_permissions1;
 
 static
-int PL_existence_error3(const char* type, const char* object, term_t in)
+bool PL_existence_error3(const char* type, const char* object, term_t in)
 { term_t ex = PL_new_term_ref();
 
   if ( PL_unify_term(ex,
@@ -442,7 +442,7 @@ libarchive_seek_cb(struct archive *a, void *cdata, int64_t request, int whence)
 		 *	      PROLOG		*
 		 *******************************/
 
-static int
+static bool
 archive_error_code(int eno, const char *s)
 { term_t ex;
 
@@ -722,7 +722,7 @@ add_format(archive_wrapper *ar, term_t arg)
   return true;
 }
 
-static int
+static bool
 scan_type_list(archive_wrapper *ar, term_t list,
 	       int (*add)(archive_wrapper *ar, term_t arg))
 { term_t tail = PL_copy_term_ref(list);
