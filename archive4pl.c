@@ -161,12 +161,12 @@ static archive_wrapper archive_wrapper_init_value =
   AR_VIRGIN,		/* type			*/
   ARCHIVE_MAGIC,	/* magic		*/
   AR_VIRGIN,		/* status		*/
-  FALSE,		/* close_parent		*/
-  FALSE,		/* closed_archive	*/
+  false,		/* close_parent		*/
+  false,		/* closed_archive	*/
   NULL,			/* archive		*/
   NULL,			/* entry		*/
   ' ',			/* how			*/
-  FALSE			/* agc			*/
+  false			/* agc			*/
 };
 
 #if 0
@@ -251,7 +251,7 @@ int PL_existence_error3(const char* type, const char* object, term_t in)
                      PL_TERM, in,
                      PL_VARIABLE))
     return PL_raise_exception(ex);
-  return FALSE;
+  return false;
 }
 
 		 /*******************************
@@ -281,7 +281,7 @@ ar_w_release_cb(atom_t symbol)
 { archive_wrapper *ar = PL_blob_data(symbol, NULL, NULL);
 
   assert(ar->magic == ARCHIVE_MAGIC);
-  ar->agc = TRUE;
+  ar->agc = true;
 
   /* TODO: The following assert isn't always true */
   /* assert(ar->status != AR_OPENED_ENTRY); */
@@ -291,7 +291,7 @@ ar_w_release_cb(atom_t symbol)
     archive_entry_free(ar->entry); /* Safe even if !ar->entry */
   archive_free_handle(ar);
 
-  return TRUE;
+  return true;
 }
 
 static int
@@ -310,7 +310,7 @@ ar_w_write_cb(IOSTREAM *s, atom_t symbol, int flags)
 
   Sfprintf(s, "<archive>(%p)", ar);
 
-  return TRUE;
+  return true;
 }
 
 static PL_blob_t archive_blob =
@@ -455,7 +455,7 @@ archive_error_code(int eno, const char *s)
 			 PL_VARIABLE) ) )
     return PL_raise_exception(ex);
 
-  return FALSE;
+  return false;
 }
 
 static int
@@ -585,7 +585,7 @@ add_filter(archive_wrapper *ar, term_t arg)
 { atom_t c;
 
   if ( !PL_get_atom_ex(arg, &c) )
-    return FALSE;
+    return false;
   if ( ar->how == 'w' && ((ar->type & FILTER_MASK) != 0) )
     return ar_set_status_error(ar, PL_permission_error("set", "filter", arg));
   if ( c == ATOM_all )
@@ -644,7 +644,7 @@ add_filter(archive_wrapper *ar, term_t arg)
   else
     return ar_set_status_error(ar, PL_domain_error("filter", arg));
 
-  return TRUE;
+  return true;
 }
 
 static int
@@ -652,7 +652,7 @@ add_format(archive_wrapper *ar, term_t arg)
 { atom_t f;
 
   if ( !PL_get_atom_ex(arg, &f) )
-    return FALSE;
+    return false;
   if ( ar->how == 'w' && (( ar->type & FORMAT_MASK ) != 0 ) )
     return ar_set_status_error(ar, PL_permission_error("set", "format", arg));
   if ( f == ATOM_all )
@@ -719,7 +719,7 @@ add_format(archive_wrapper *ar, term_t arg)
   else
     return ar_set_status_error(ar, PL_domain_error("format", arg));
 
-  return TRUE;
+  return true;
 }
 
 static int
@@ -730,7 +730,7 @@ scan_type_list(archive_wrapper *ar, term_t list,
 
   while( PL_get_list_ex(tail, head, tail) )
   { if ( !(*add)(ar, head) )
-      return FALSE;
+      return false;
   }
 
   return PL_get_nil_ex(tail);
@@ -756,7 +756,7 @@ archive_open_stream(term_t data, term_t mode, term_t handle, term_t options)
 
     if ( !PL_unify_blob(handle, &ar_local, sizeof ar_local, &archive_blob) ||
          !PL_get_atom_ex(handle, &a) )
-      return FALSE;
+      return false;
     ar = PL_blob_data(a, NULL, NULL);
   }
 
@@ -775,11 +775,11 @@ archive_open_stream(term_t data, term_t mode, term_t handle, term_t options)
       { return ar_set_status_error(ar, PL_domain_error("io_mode", mode));
       }
     } else
-    { return FALSE;
+    { return false;
     }
 
     if ( !PL_get_stream(data, &ar->data, flags) )
-      return FALSE;
+      return false;
   }
 
   { term_t filters = 0, formats = 0;
@@ -788,9 +788,9 @@ archive_open_stream(term_t data, term_t mode, term_t handle, term_t options)
 			  &filters, &formats, &ar->close_parent) )
       return ar_set_status_error(ar, false);
     if ( filters && !scan_type_list(ar, filters, add_filter) )
-      return FALSE;
+      return false;
     if ( formats && !scan_type_list(ar, formats, add_format) )
-      return FALSE;
+      return false;
   }
 
   if ( ar->how == 'r' )
@@ -904,7 +904,7 @@ archive_open_stream(term_t data, term_t mode, term_t handle, term_t options)
 
      if ( (rc=archive_read_open1(ar->archive)) == ARCHIVE_OK )
      { ar->status = AR_OPENED_ARCHIVE;
-       return TRUE;
+       return true;
      }
   } else if ( ar->how == 'w' )
   { if ( !(ar->archive = archive_write_new()) )
@@ -971,7 +971,7 @@ archive_open_stream(term_t data, term_t mode, term_t handle, term_t options)
     if ( (rc=archive_write_open(ar->archive, ar,
 				libarchive_open_cb, libarchive_write_cb, libarchive_close_cb)) == ARCHIVE_OK )
     { ar->status = AR_OPENED_ARCHIVE;
-      return TRUE;
+      return true;
     }
   } else {
     assert(0);
@@ -989,7 +989,7 @@ archive_property(term_t archive, term_t prop, term_t value)
 
   if ( !get_archive(archive, &ar) ||
        !PL_get_atom_ex(prop, &pn) )
-    return FALSE;
+    return false;
 
   if ( pn == ATOM_filter )
   { int i, fcount = archive_filter_count(ar->archive);
@@ -1004,12 +1004,12 @@ archive_property(term_t archive, term_t prop, term_t value)
 
       if ( !PL_unify_list(tail, head, tail) ||
 	   !PL_unify_atom_chars(head, s) )
-	return FALSE;
+	return false;
     }
     return PL_unify_nil(tail);
   }
 
-  return FALSE;
+  return false;
 }
 
 
@@ -1019,7 +1019,7 @@ archive_next_header(term_t archive, term_t name)
   int rc;
 
   if ( !get_archive(archive, &ar) )
-    return FALSE;
+    return false;
   if ( ar->how == 'w' )
   { char* pathname = NULL;
     if ( ar->status == AR_OPENED_ENTRY )
@@ -1040,7 +1040,7 @@ archive_next_header(term_t archive, term_t name)
     archive_entry_set_filetype(ar->entry, AE_IFREG);
     archive_entry_set_perm(ar->entry, 0644);
     ar->status = AR_NEW_ENTRY;
-    return TRUE;
+    return true;
   }
   if ( ar->status == AR_NEW_ENTRY )
   { if ( (rc=archive_read_data_skip(ar->archive)) != ARCHIVE_OK )
@@ -1059,19 +1059,19 @@ archive_next_header(term_t archive, term_t name)
     } else if ( (bname = archive_entry_pathname(ar->entry)) )
     { ok = PL_unify_chars(name, PL_ATOM, -1, bname); /* not in locale: bytes */
     } else
-    { ok = FALSE;			/* no name */
+    { ok = false;			/* no name */
     }
 
     if ( ok )
     { ar->status = AR_NEW_ENTRY;
-      return TRUE;
+      return true;
     }
     if ( PL_exception(0) )
-      return FALSE;
+      return false;
   }
 
   if ( rc == ARCHIVE_EOF )
-    return FALSE;			/* simply at the end */
+    return false;			/* simply at the end */
 
   return archive_error(ar, rc);
 }
@@ -1083,12 +1083,12 @@ archive_close(term_t archive)
   int rc;
 
   if ( !get_archive(archive, &ar) )
-    return FALSE;
+    return false;
 
   if ( ar->status == AR_OPENED_ENTRY )
-  { ar->closed_archive = TRUE;
+  { ar->closed_archive = true;
 
-    return TRUE;
+    return true;
   } else
   { int eno;
 
@@ -1098,7 +1098,7 @@ archive_close(term_t archive)
     ar->archive = NULL;
     ar->symbol = 0;
     if ( rc == ARCHIVE_OK )
-      return TRUE;
+      return true;
 
     return archive_error_code(eno ? eno : rc, "close failed");
   }
@@ -1114,7 +1114,7 @@ archive_header_prop_(term_t archive, term_t field)
   functor_t prop;
 
   if ( !get_archive(archive, &ar) )
-    return FALSE;
+    return false;
 
   if ( !PL_get_functor(field, &prop) )
     return ar_set_status_error(ar, PL_type_error("compound", field));
@@ -1168,7 +1168,7 @@ archive_header_prop_(term_t archive, term_t field)
       return PL_unify_wchars(arg, PL_ATOM, (size_t)-1, target);
     }
 
-    return FALSE;
+    return false;
   } else if ( prop == FUNCTOR_permissions1 )
   { __LA_MODE_T perm = archive_entry_perm(ar->entry);
     term_t arg = PL_new_term_ref();
@@ -1202,7 +1202,7 @@ archive_set_header_property(term_t archive, term_t field)
   functor_t prop;
 
   if ( !get_archive(archive, &ar) )
-    return FALSE;
+    return false;
 
   if ( !PL_get_functor(field, &prop) )
     return ar_set_status_error(ar, PL_type_error("compound", field));
@@ -1359,7 +1359,7 @@ archive_open_entry(term_t archive, term_t stream)
   /* If you make changes here, be sure to also change ar_entry_close() */
 
   if ( !get_archive(archive, &ar) )
-    return FALSE;
+    return false;
   if ( ar->how == 'r' )
   { if ( ar->status != AR_NEW_ENTRY )
       return PL_permission_error("access", "archive_entry", archive);
@@ -1367,10 +1367,10 @@ archive_open_entry(term_t archive, term_t stream)
     { ar->status = AR_OPENED_ENTRY;
       if ( PL_unify_stream(stream, entry_data) )
       { PL_register_atom(ar->symbol);	/* We may no longer reference the */
-        return TRUE;			/* archive itself */
+        return true;			/* archive itself */
       }
       Sclose(entry_data);
-      return FALSE;
+      return false;
     }
   } else if ( ar->how == 'w' )
   { /* First we must finalize the header before trying to write the data */
@@ -1386,10 +1386,10 @@ archive_open_entry(term_t archive, term_t stream)
     { ar->status = AR_OPENED_ENTRY;
       if ( PL_unify_stream(stream, entry_data) )
       { PL_register_atom(ar->symbol);	/* We may no longer reference the */
-        return TRUE;			/* archive itself */
+        return true;			/* archive itself */
       }
       Sclose(entry_data);
-      return FALSE;
+      return false;
     }
   }
 
